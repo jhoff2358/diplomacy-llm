@@ -21,7 +21,7 @@ Turkey (3)
 Ank, Con, Smy
 
 # Game History
-## Spring 1901
+## Spring 1901 (CURRENT SEASON)
 Austria
 A Bud
 F Tri

@@ -5,6 +5,7 @@ Main interface for running the multi-agent Diplomacy game.
 
 Usage:
     python diplomacy.py <country>     # Run a turn for a specific country
+    python diplomacy.py readiness     # Check if countries are ready to submit orders
     python diplomacy.py orders        # Collect orders from all countries
     python diplomacy.py status        # Show current game status
 """
@@ -62,6 +63,49 @@ def run_country_turn(country: str):
         import traceback
         traceback.print_exc()
 
+
+def check_readiness():
+    """Check if all countries are ready to submit orders."""
+    print("\n" + "="*60)
+    print("READINESS CHECK")
+    print("="*60 + "\n")
+
+    # Load current season from config.yaml
+    config = load_config()
+    season = config['game'].get('current_season', 'Unknown')
+
+    print(f"Season: {season}")
+    print(f"Checking if countries are ready to submit orders...")
+    print(f"Using model: gemini-flash-latest (cheap model for readiness checks)\n")
+
+    ready_count = 0
+    need_discussion = 0
+
+    for country in get_all_countries():
+        print(f"\n{'='*60}")
+        print(f"{country}")
+        print(f"{'='*60}")
+        try:
+            agent = DiplomacyAgent(country)
+            # Use cheap Flash model for readiness checks to save costs
+            response = agent.check_readiness(model_override="gemini-flash-latest")
+            print(response)
+
+            # Simple heuristic to count readiness
+            if "READY" in response.upper() and "NEED MORE" not in response.upper():
+                ready_count += 1
+            else:
+                need_discussion += 1
+
+        except Exception as e:
+            print(f"✗ Error checking {country}: {e}")
+
+    print(f"\n{'='*60}")
+    print("SUMMARY")
+    print(f"{'='*60}")
+    print(f"Ready: {ready_count}/{len(get_all_countries())}")
+    print(f"Need more discussion: {need_discussion}/{len(get_all_countries())}")
+    print()
 
 def collect_orders():
     """Collect orders from all countries."""
@@ -151,6 +195,7 @@ def main():
     if len(sys.argv) < 2:
         print("Usage:")
         print("  python diplomacy.py <country>    # Run a turn for a country")
+        print("  python diplomacy.py readiness    # Check if countries are ready for orders")
         print("  python diplomacy.py orders       # Collect orders from all countries")
         print("  python diplomacy.py status       # Show game status")
         print(f"\nCountries: {', '.join(get_all_countries())}")
@@ -159,7 +204,9 @@ def main():
     command = sys.argv[1].lower()
 
     # Special commands
-    if command == "orders":
+    if command == "readiness":
+        check_readiness()
+    elif command == "orders":
         collect_orders()
     elif command == "status":
         show_status()

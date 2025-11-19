@@ -176,6 +176,37 @@ What would you like to do this turn?"""
         notes_file.write_text(new_notes)
         print(f"  ✓ Notes updated")
 
+    def check_readiness(self, model_override: str = None) -> str:
+        """Ask the agent if they're ready to submit orders or need more discussion.
+
+        Args:
+            model_override: Optional model name to use instead of config default.
+                          Use a cheaper model like 'gemini-flash-latest' to save costs.
+        """
+        context = self.context_loader.format_context()
+
+        # Use override model if provided, otherwise use default
+        if model_override:
+            model = genai.GenerativeModel(model_override)
+        else:
+            model = self.model
+
+        # Create a fresh chat for readiness check
+        chat = model.start_chat(history=[])
+
+        prompt = f"""{context}
+
+Before we collect orders, I want to check: Are you ready to submit orders for this phase, or do you feel there is more diplomatic discussion needed first?
+
+Please respond briefly with:
+1. Your readiness status (READY or NEED MORE DISCUSSION)
+2. A short 1-2 sentence explanation
+
+Do not use XML tags for this response, just answer directly."""
+
+        response = chat.send_message(prompt)
+        return response.text.strip()
+
     def get_orders(self) -> str:
         """Ask the agent for their orders for this phase."""
         context = self.context_loader.format_context()
