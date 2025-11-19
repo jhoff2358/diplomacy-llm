@@ -94,3 +94,47 @@ Turkey
 F Ank - BLA FAILS (Attack strength is not greater than the prevent strength)
 A Bul - Rum SUCCEEDS
 A Con - Bul SUCCEEDS
+
+Winter 1901 (CURRENT SEASON)
+England
+	Up to 1 more builds.
+Lon			
+Lvp			
+Edi		
+
+Austria
+	Up to 2 more builds.
+Tri			
+Bud			
+Vie	Occupied
+
+Turkey
+	Up to 2 more builds.
+Con			
+Smy			
+Ank	Occupied
+
+Italy
+	Up to 1 more builds.
+Rom			
+Nap			
+Ven	Occupied
+
+France
+	Up to 2 more builds.
+Par			
+Mar			
+Bre		
+
+Russia
+	Up to 1 more builds.
+Stp			sc	nc
+Mos			
+Sev	Occupied
+War	Occupied
+
+Germany
+	Up to 2 more builds.
+Ber			
+Mun			
+Kie			

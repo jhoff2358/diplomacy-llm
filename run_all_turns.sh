@@ -1,28 +1,30 @@
 #!/bin/bash
-# Run all 7 countries in randomized order, sequentially
+# Run all 7 countries in the saved turn order, sequentially
 
 # Activate venv
 source venv/bin/activate
 
-# Get all countries and shuffle them
-countries=("Austria" "England" "France" "Germany" "Italy" "Russia" "Turkey")
-
-# Shuffle using shuf (if available) or fall back to sort -R
-if command -v shuf &> /dev/null; then
-    shuffled=($(printf '%s\n' "${countries[@]}" | shuf))
-else
-    shuffled=($(printf '%s\n' "${countries[@]}" | sort -R))
+# Check if turn_order.txt exists
+if [ ! -f "turn_order.txt" ]; then
+    echo "ERROR: turn_order.txt not found!"
+    echo ""
+    echo "Please run ./randomize_order.sh first to set the turn order."
+    echo ""
+    exit 1
 fi
 
+# Read turn order from file
+mapfile -t turn_order < turn_order.txt
+
 echo "=========================================="
-echo "Running all countries in random order:"
+echo "Running all countries in saved turn order:"
 echo "=========================================="
-printf '%s\n' "${shuffled[@]}"
+printf '%s\n' "${turn_order[@]}"
 echo "=========================================="
 echo ""
 
 # Run each country sequentially
-for country in "${shuffled[@]}"; do
+for country in "${turn_order[@]}"; do
     echo ""
     echo "######################################"
     echo "# Running: $country"

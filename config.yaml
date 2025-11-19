@@ -15,7 +15,7 @@ model: gemini-3-pro-preview
 
 # Game settings
 game:
-  current_season: Spring 1901  # Update this as the game progresses
+  current_season: Winter 1901  # Update this as the game progresses
   notes: ""  # Optional notes about current game state
 
 # File paths
