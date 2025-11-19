@@ -74,9 +74,10 @@ def check_readiness():
     config = load_config()
     season = config['game'].get('current_season', 'Unknown')
 
+    cheap_model = config.get('cheap_model', 'gemini-flash-latest')
     print(f"Season: {season}")
     print(f"Checking if countries are ready to submit orders...")
-    print(f"Using model: gemini-flash-latest (cheap model for readiness checks)\n")
+    print(f"Using model: {cheap_model} (cheap model for readiness checks)\n")
 
     ready_count = 0
     need_discussion = 0
@@ -87,8 +88,8 @@ def check_readiness():
         print(f"{'='*60}")
         try:
             agent = DiplomacyAgent(country)
-            # Use cheap Flash model for readiness checks to save costs
-            response = agent.check_readiness(model_override="gemini-flash-latest")
+            # check_readiness uses cheap model from config by default
+            response = agent.check_readiness()
             print(response)
 
             # Simple heuristic to count readiness

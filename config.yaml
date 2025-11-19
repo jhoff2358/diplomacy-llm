@@ -10,8 +10,9 @@ countries:
   - Russia
   - Turkey
 
-# Gemini model to use
-model: gemini-3-pro-preview
+# Gemini models to use
+model: gemini-3-pro-preview  # Main model for turns
+cheap_model: gemini-flash-latest  # Cheap model for readiness/orders
 
 # Game settings
 game:

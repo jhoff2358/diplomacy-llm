@@ -181,15 +181,15 @@ What would you like to do this turn?"""
 
         Args:
             model_override: Optional model name to use instead of config default.
-                          Use a cheaper model like 'gemini-flash-latest' to save costs.
+                          Defaults to cheap_model from config to save costs.
         """
         context = self.context_loader.format_context()
 
-        # Use override model if provided, otherwise use default
+        # Use override model if provided, otherwise use cheap model from config
         if model_override:
             model = genai.GenerativeModel(model_override)
         else:
-            model = self.model
+            model = genai.GenerativeModel(self.config['cheap_model'])
 
         # Create a fresh chat for readiness check
         chat = model.start_chat(history=[])
@@ -208,11 +208,14 @@ Do not use XML tags for this response, just answer directly."""
         return response.text.strip()
 
     def get_orders(self) -> str:
-        """Ask the agent for their orders for this phase."""
+        """Ask the agent for their orders for this phase.
+        Uses cheap model from config to save costs.
+        """
         context = self.context_loader.format_context()
 
-        # Create a fresh chat for orders
-        chat = self.model.start_chat(history=[])
+        # Create a fresh chat for orders using cheap model
+        cheap_model = genai.GenerativeModel(self.config['cheap_model'])
+        chat = cheap_model.start_chat(history=[])
 
         prompt = f"""{context}
 
