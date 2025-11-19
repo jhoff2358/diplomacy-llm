@@ -1,0 +1,27 @@
+# Diplomacy LLM Configuration
+
+# Countries in the game
+countries:
+  - Austria
+  - England
+  - France
+  - Germany
+  - Italy
+  - Russia
+  - Turkey
+
+# Gemini model to use
+model: gemini-2.0-flash-exp
+
+# Game settings
+game:
+  starting_year: 1901
+  starting_season: Spring
+
+# File paths
+paths:
+  data_dir: .
+  shared_conversations_dir: conversations  # Shared by all countries
+  shared_game_history: game_history.md  # Shared by all countries
+  plans_file: plans.md
+  notes_file: notes.md

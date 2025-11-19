@@ -1,0 +1,35 @@
+# API keys and secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Game state (user manages these manually)
+conversations/
+*/plans.md
+*/notes.md
+orders.md
+
+# Claude Code
+.claude/
