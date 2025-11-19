@@ -74,6 +74,11 @@ game:
   current_season: Spring 1902  # Update this!
 ```
 
+Activate your venv (only need to do once per terminal session):
+```bash
+source venv/bin/activate
+```
+
 Randomize the turn order (do this once per season):
 ```bash
 ./randomize_order.sh
@@ -94,7 +99,6 @@ This runs all 7 countries sequentially in the randomized order. The LLMs will se
 
 Before collecting orders, you can check if countries want more discussion:
 ```bash
-source venv/bin/activate
 python3 diplomacy.py readiness
 ```
 
@@ -106,7 +110,6 @@ If they need more discussion, run `./run_all_turns.sh` again.
 
 When diplomacy is done, collect orders from all countries:
 ```bash
-source venv/bin/activate
 python3 diplomacy.py orders
 ```
 
@@ -138,31 +141,27 @@ Randomizes and saves the turn order. Do this **once per season** at the start. T
 
 ### Run Single Country
 ```bash
-source venv/bin/activate
 python3 diplomacy.py <country>
 ```
-Run one country's turn (e.g., `python3 diplomacy.py france`).
+Run one country's turn (e.g., `python3 diplomacy.py france`). Requires venv activated.
 
 ### Check Readiness
 ```bash
-source venv/bin/activate
 python3 diplomacy.py readiness
 ```
-Ask all countries if they're ready for orders or need more discussion. Uses cheap model to save costs.
+Ask all countries if they're ready for orders or need more discussion. Uses cheap model to save costs. Requires venv activated.
 
 ### Collect Orders
 ```bash
-source venv/bin/activate
 python3 diplomacy.py orders
 ```
-Collect orders from all countries and save to `orders.md`.
+Collect orders from all countries and save to `orders.md`. Requires venv activated.
 
 ### Check Status
 ```bash
-source venv/bin/activate
 python3 diplomacy.py status
 ```
-Show game status: active conversations, which countries have plans/notes.
+Show game status: active conversations, which countries have plans/notes. Requires venv activated.
 
 ### Reset Game
 ```bash
@@ -177,13 +176,14 @@ Clear all conversations, plans, and notes. Keeps `config.yaml` and `game_history
 # 1. Update config.yaml: current_season: "Spring 1902"
 # 2. Update game_history.md with Winter 1901 build results
 
+source venv/bin/activate          # Activate venv once
+
 ./randomize_order.sh              # Set turn order for this season
 
 ./run_all_turns.sh                # Round 1 of diplomacy
 ./run_all_turns.sh                # Round 2 of diplomacy
 ./run_all_turns.sh                # Round 3 of diplomacy
 
-source venv/bin/activate
 python3 diplomacy.py readiness    # Check if ready for orders
 
 ./run_all_turns.sh                # More diplomacy if needed
