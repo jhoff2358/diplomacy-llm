@@ -16,7 +16,7 @@ cheap_model: gemini-flash-latest  # Cheap model for readiness/orders
 
 # Game settings
 game:
-  current_season: Winter 1901  # Update this as the game progresses
+  current_season: Fall 1902  # Update this as the game progresses
   notes: ""  # Optional notes about current game state
 
 # File paths

@@ -6,6 +6,7 @@ Main interface for running the multi-agent Diplomacy game.
 Usage:
     python diplomacy.py <country>     # Run a turn for a specific country
     python diplomacy.py readiness     # Check if countries are ready to submit orders
+    python diplomacy.py overseer      # Check for loose ends in all conversations
     python diplomacy.py orders        # Collect orders from all countries
     python diplomacy.py status        # Show current game status
 """
@@ -14,6 +15,9 @@ import sys
 import yaml
 from pathlib import Path
 from agent import DiplomacyAgent, get_all_countries
+import google.generativeai as genai
+from dotenv import load_dotenv
+import os
 
 
 def load_config(config_path: str = "config.yaml"):
@@ -108,6 +112,78 @@ def check_readiness():
     print(f"Need more discussion: {need_discussion}/{len(get_all_countries())}")
     print()
 
+def overseer():
+    """Analyze all conversations for loose ends and unresolved discussions."""
+    print("\n" + "="*60)
+    print("OVERSEER ANALYSIS")
+    print("="*60 + "\n")
+
+    # Load current season from config.yaml
+    config = load_config()
+    season = config['game'].get('current_season', 'Unknown')
+    cheap_model_name = config.get('cheap_model', 'gemini-flash-latest')
+
+    print(f"Season: {season}")
+    print(f"Analyzing all conversations for loose ends...")
+    print(f"Using model: {cheap_model_name}\n")
+
+    # Load API key and configure Gemini
+    load_dotenv()
+    api_key = os.getenv('GEMINI_API_KEY')
+    if not api_key:
+        print("Error: GEMINI_API_KEY not found in .env file")
+        return
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(cheap_model_name)
+
+    # Get all conversation files
+    conv_dir = Path("conversations")
+    if not conv_dir.exists():
+        print("No conversations directory found.")
+        return
+
+    conv_files = list(conv_dir.glob("*.md"))
+    if not conv_files:
+        print("No conversations found.")
+        return
+
+    # Read all conversations
+    all_conversations = []
+    for conv_file in sorted(conv_files):
+        content = conv_file.read_text()
+        # Get last 100 lines
+        lines = content.split('\n')
+        last_lines = lines[-100:] if len(lines) > 100 else lines
+        snippet = '\n'.join(last_lines)
+
+        all_conversations.append(f"## {conv_file.stem}\n{snippet}\n")
+
+    # Combine all conversations
+    combined = '\n'.join(all_conversations)
+
+    # Ask LLM to analyze
+    prompt = f"""You are overseeing a Diplomacy game. The current season is: {season}
+
+Below are the last ~100 lines from each conversation between countries:
+
+{combined}
+
+Based on these conversations, please identify:
+1. Any loose ends or unresolved discussions
+2. Promises or agreements that haven't been addressed
+3. Questions that were asked but not answered
+4. Any tensions or conflicts that seem to be building
+5. Overall readiness for the current phase
+
+Be concise and focus on actionable insights."""
+
+    chat = model.start_chat(history=[])
+    response = chat.send_message(prompt)
+
+    print(response.text)
+    print()
+
 def collect_orders():
     """Collect orders from all countries."""
     print("\n" + "="*60)
@@ -197,6 +273,7 @@ def main():
         print("Usage:")
         print("  python diplomacy.py <country>    # Run a turn for a country")
         print("  python diplomacy.py readiness    # Check if countries are ready for orders")
+        print("  python diplomacy.py overseer     # Analyze conversations for loose ends")
         print("  python diplomacy.py orders       # Collect orders from all countries")
         print("  python diplomacy.py status       # Show game status")
         print(f"\nCountries: {', '.join(get_all_countries())}")
@@ -207,6 +284,8 @@ def main():
     # Special commands
     if command == "readiness":
         check_readiness()
+    elif command == "overseer":
+        overseer()
     elif command == "orders":
         collect_orders()
     elif command == "status":

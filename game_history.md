@@ -1,4 +1,4 @@
-# Current SCs -- Spring 1901
+# Current SCs
 Austria (5)
 Bud, Tri, Vie, Ser, Gre
 
@@ -95,46 +95,146 @@ F Ank - BLA FAILS (Attack strength is not greater than the prevent strength)
 A Bul - Rum SUCCEEDS
 A Con - Bul SUCCEEDS
 
-Winter 1901 (CURRENT SEASON)
-England
-	Up to 1 more builds.
-Lon			
-Lvp			
-Edi		
-
+## Winter 1901
 Austria
-	Up to 2 more builds.
-Tri			
-Bud			
-Vie	Occupied
+F Gre
+A Ser
+A Vie
+A Tri Build SUCCEEDS
+A Bud Build SUCCEEDS
 
-Turkey
-	Up to 2 more builds.
-Con			
-Smy			
-Ank	Occupied
-
-Italy
-	Up to 1 more builds.
-Rom			
-Nap			
-Ven	Occupied
+England
+F NTH
+F NWG
+A Nwy
+F Lon Build SUCCEEDS
 
 France
-	Up to 2 more builds.
-Par			
-Mar			
-Bre		
-
-Russia
-	Up to 1 more builds.
-Stp			sc	nc
-Mos			
-Sev	Occupied
-War	Occupied
+A Pic
+F Por
+A Spa
+A Par Build SUCCEEDS
+A Mar Build SUCCEEDS
 
 Germany
-	Up to 2 more builds.
-Ber			
-Mun			
-Kie			
+F Den
+A Hol
+A Ruh
+A Mun Build SUCCEEDS
+A Ber Build SUCCEEDS
+
+Italy
+F ION
+A Tun
+A Ven
+F Nap Build SUCCEEDS
+
+Russia
+F Sev
+F Swe
+A Ukr
+A War
+A Mos Build SUCCEEDS
+
+Turkey
+F Ank
+A Bul
+A Rum
+A Con Build SUCCEEDS
+F Smy Build SUCCEEDS
+
+## Spring 1902
+Austria
+A Bud S Vie - Gal SUCCEEDS
+F Gre H SUCCEEDS
+A Ser S Rum SUCCEEDS
+A Tri - Alb SUCCEEDS
+A Vie - Gal SUCCEEDS
+
+England
+F Lon - ENG SUCCEEDS
+F NTH S Ruh - Bel SUCCEEDS
+F NWG - BAR SUCCEEDS
+A Nwy H SUCCEEDS
+
+France
+A Mar - Bur SUCCEEDS
+A Par S Mar - Bur SUCCEEDS
+A Pic - Bel FAILS (Attack strength is not greater than the prevent strength)
+F Por - MAO SUCCEEDS
+A Spa - Gas SUCCEEDS
+
+Germany
+A Ber - Mun FAILS (Attack strength is not greater than the defend strength)
+F Den - HEL SUCCEEDS
+A Hol S Ruh - Bel SUCCEEDS
+A Mun - Bur FAILS (Attack strength is not greater than the prevent strength)
+A Ruh - Bel SUCCEEDS
+
+Italy
+F ION - EAS SUCCEEDS
+F Nap - ION SUCCEEDS
+A Tun H SUCCEEDS
+A Ven - Tri SUCCEEDS
+
+Russia
+A Mos - Ukr FAILS (Attack strength is not greater than the defend strength)
+F Sev - BLA FAILS (Attack strength is not greater than the prevent strength)
+F Swe H SUCCEEDS
+A Ukr - Rum FAILS (Attack strength is not greater than the defend strength)
+A War - Gal FAILS (Attack strength is not greater than the prevent strength)
+
+Turkey
+F Ank - BLA FAILS (Attack strength is not greater than the prevent strength)
+A Bul S Rum SUCCEEDS
+A Con S Ank - BLA FAILS (Army can't support that territory)
+A Rum S Ser FAILS (Disrupted by attack)
+F Smy - AEG SUCCEEDS
+
+Fall 1902 (CURRENT SEASON)
+Austria
+A Alb
+A Bud
+A Gal
+F Gre
+A Ser
+
+England
+F BAR
+F ENG
+F NTH
+A Nwy
+
+France
+A Bur
+A Gas
+F MAO
+A Par
+A Pic
+
+Germany
+A Bel
+A Ber
+F HEL
+A Hol
+A Mun
+
+Italy
+F EAS
+F ION
+A Tri
+A Tun
+
+Russia
+A Mos
+F Sev
+F Swe
+A Ukr
+A War
+
+Turkey
+F AEG
+F Ank
+A Bul
+A Con
+A Rum

@@ -151,6 +151,12 @@ python3 diplomacy.py readiness
 ```
 Ask all countries if they're ready for orders or need more discussion. Uses cheap model to save costs. Requires venv activated.
 
+### Overseer Analysis
+```bash
+python3 diplomacy.py overseer
+```
+Analyze all conversations for loose ends, unresolved discussions, and overall readiness. Reads the last ~100 lines from each conversation and provides high-level insights. Uses cheap model to save costs. Requires venv activated.
+
 ### Collect Orders
 ```bash
 python3 diplomacy.py orders
