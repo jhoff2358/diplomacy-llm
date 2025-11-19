@@ -10,18 +10,15 @@ Usage:
 """
 
 import sys
-import json
+import yaml
 from pathlib import Path
 from agent import DiplomacyAgent, get_all_countries
 
 
-def load_gamestate():
-    """Load current game state from gamestate.json."""
-    gamestate_file = Path("gamestate.json")
-    if gamestate_file.exists():
-        with open(gamestate_file, 'r') as f:
-            return json.load(f)
-    return {"season": "Unknown"}
+def load_config(config_path: str = "config.yaml"):
+    """Load configuration including current season."""
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
 
 
 def run_country_turn(country: str):
@@ -29,9 +26,9 @@ def run_country_turn(country: str):
     try:
         agent = DiplomacyAgent(country)
 
-        # Load current season from gamestate.json
-        gamestate = load_gamestate()
-        season = gamestate.get('season', 'Unknown')
+        # Load current season from config.yaml
+        config = load_config()
+        season = config['game'].get('current_season', 'Unknown')
 
         print(f"\nCurrent Season: {season}")
 
@@ -72,9 +69,9 @@ def collect_orders():
     print("COLLECTING ORDERS FROM ALL COUNTRIES")
     print("="*60 + "\n")
 
-    # Load current season from gamestate.json
-    gamestate = load_gamestate()
-    season = f"{gamestate.get('season', 'Unknown')} - Orders"
+    # Load current season from config.yaml
+    config = load_config()
+    season = f"{config['game'].get('current_season', 'Unknown')} - Orders"
 
     print(f"Season: {season}\n")
 
@@ -107,11 +104,11 @@ def show_status():
     print("GAME STATUS")
     print("="*60 + "\n")
 
-    # Show current game state
-    gamestate = load_gamestate()
-    print(f"Current Season: {gamestate.get('season', 'Unknown')}")
-    if gamestate.get('notes'):
-        print(f"Notes: {gamestate.get('notes')}")
+    # Show current game state from config.yaml
+    config = load_config()
+    print(f"Current Season: {config['game'].get('current_season', 'Unknown')}")
+    if config['game'].get('notes'):
+        print(f"Notes: {config['game'].get('notes')}")
     print()
 
     # Check conversations directory

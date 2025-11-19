@@ -11,12 +11,12 @@ countries:
   - Turkey
 
 # Gemini model to use
-model: gemini-2.0-flash-exp
+model: gemini-3-pro-preview
 
 # Game settings
 game:
-  starting_year: 1901
-  starting_season: Spring
+  current_season: Spring 1901  # Update this as the game progresses
+  notes: ""  # Optional notes about current game state
 
 # File paths
 paths:
