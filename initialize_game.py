@@ -37,14 +37,11 @@ def create_game_state_template(country: str) -> str:
 
 Season: Spring 1901
 
-## Your Units
-*To be filled in by game master*
+## Permanent Home SC Visibility
+## Supply Centers you control marked with an asterisk. Assume provinces do not contain units unless explicitly specified
 
-## Visible Territories
-*To be filled in by game master*
-
-## Visible Enemy Units
-*To be filled in by game master*
+## Additional visibility from units:
+None yet
 
 ## Countries You Border (Can Message)
 *To be filled in by game master*
@@ -64,14 +61,6 @@ def main():
     # Create conversations directory
     conversations_dir.mkdir(parents=True, exist_ok=True)
     print(f"✓ Created {conversations_dir}/")
-
-    # Create all bilateral conversation files
-    for i, country1 in enumerate(COUNTRIES):
-        for country2 in COUNTRIES[i+1:]:
-            conv_file = conversations_dir / f"{country1}-{country2}.md"
-            if not conv_file.exists():
-                conv_file.write_text(f"# Conversation: {country1} - {country2}\n\n")
-    print(f"✓ Created {len(COUNTRIES) * (len(COUNTRIES) - 1) // 2} conversation files")
 
     # Create per-country directories and files
     for country in COUNTRIES:
