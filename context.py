@@ -108,6 +108,8 @@ class ContextLoader:
 - You can only MESSAGE countries listed in your game_state
 - You can READ all conversation history
 
+**IMPORTANT:** If a territory is listed in your game_state without a unit, it is CONFIRMED EMPTY. You have full visibility there - no need to speculate about hidden units.
+
 **FILE MANAGEMENT:**
 You can create and manage your own files to organize your thoughts however you like.
 <FILE name="filename.md" mode="append|edit|delete">content</FILE>
