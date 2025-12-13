@@ -1,12 +1,14 @@
 """
-Agent manager for Fog of War Diplomacy countries.
+Agent manager for Diplomacy countries.
 Manages Gemini chat sessions and handles country actions.
+Supports both classic and fog of war modes.
 """
 
 import os
 import re
+import shutil
 from pathlib import Path
-from typing import Optional, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 import google.generativeai as genai
 from dotenv import load_dotenv
 import yaml
@@ -44,6 +46,21 @@ class DiplomacyAgent:
 
         # Country directory
         self.country_dir = Path(self.config['paths']['data_dir']) / country
+
+    def is_fow(self) -> bool:
+        """Check if fog of war mode is enabled."""
+        return self.config.get('features', {}).get('fog_of_war', False)
+
+    def sync_shared_game_state(self):
+        """In classic mode, copy root game_state.md to country folder."""
+        if self.is_fow():
+            return  # FoW mode uses per-country files directly
+
+        shared_state = Path(self.config['paths']['data_dir']) / 'game_state.md'
+        if shared_state.exists():
+            country_state = self.country_dir / self.config['paths']['game_state']
+            self.country_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy(shared_state, country_state)
 
     def initialize_session(self):
         """Initialize or reset the chat session with current context."""
@@ -99,8 +116,17 @@ Reflect on the past year and prepare for the next:"""
 
         return initial_prompt
 
-    def parse_response(self, response_text: str) -> Dict[str, any]:
-        """Parse XML-style tags from LLM response."""
+    def parse_response(self, response_text: str) -> Dict[str, Any]:
+        """Parse XML-style tags from LLM response.
+
+        Extracts MESSAGE and FILE tags from the response text.
+
+        MESSAGE format: <MESSAGE to="Country1, Country2">content</MESSAGE>
+        FILE format: <FILE name="filename.md" mode="append|edit|delete">content</FILE>
+
+        Returns:
+            Dict with 'messages' and 'files' lists containing parsed actions.
+        """
         actions = {
             'messages': [],
             'files': []
@@ -136,7 +162,7 @@ Reflect on the past year and prepare for the next:"""
 
         return actions
 
-    def execute_actions(self, actions: Dict[str, any], season: str = None):
+    def execute_actions(self, actions: Dict[str, Any], season: str = None):
         """Execute parsed actions."""
         # Send messages
         for msg in actions['messages']:
@@ -146,8 +172,9 @@ Reflect on the past year and prepare for the next:"""
         for file_op in actions['files']:
             self.write_file(file_op['name'], file_op['content'], file_op['mode'])
 
-    def take_turn(self, season: str = None) -> Tuple[str, Dict[str, any]]:
+    def take_turn(self, season: str = None) -> Tuple[str, Dict[str, Any]]:
         """Take a turn: show context and get LLM response."""
+        self.sync_shared_game_state()  # Copy shared state in classic mode
         prompt = self.initialize_session()
 
         # Get response from LLM
@@ -159,8 +186,9 @@ Reflect on the past year and prepare for the next:"""
 
         return response_text, actions
 
-    def take_reflect_turn(self) -> Tuple[str, Dict[str, any]]:
+    def take_reflect_turn(self) -> Tuple[str, Dict[str, Any]]:
         """Take a reflection turn focused on strategic thinking."""
+        self.sync_shared_game_state()  # Copy shared state in classic mode
         prompt = self.initialize_reflect_session()
 
         # Get response from LLM
@@ -238,6 +266,7 @@ Reflect on the past year and prepare for the next:"""
             model_override: Optional model name to use instead of config default.
                           Defaults to cheap_model from config to save costs.
         """
+        self.sync_shared_game_state()  # Copy shared state in classic mode
         context = self.context_loader.format_context()
 
         # Use override model if provided, otherwise use cheap model from config
@@ -266,6 +295,7 @@ Do not use XML tags for this response, just answer directly."""
         """Ask the agent for their orders for this phase.
         Uses cheap model from config to save costs.
         """
+        self.sync_shared_game_state()  # Copy shared state in classic mode
         context = self.context_loader.format_context()
 
         # Create a fresh chat for orders using cheap model
@@ -282,10 +312,3 @@ Your orders:"""
 
         response = chat.send_message(prompt)
         return response.text
-
-
-def get_all_countries(config_path: str = "config.yaml") -> List[str]:
-    """Get list of all countries from config."""
-    with open(config_path, 'r') as f:
-        config = yaml.safe_load(f)
-    return config['countries']

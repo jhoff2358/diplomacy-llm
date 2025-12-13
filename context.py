@@ -1,6 +1,7 @@
 """
-Context loader for Fog of War Diplomacy agents.
+Context loader for Diplomacy agents.
 Loads and formats all context needed for a country to make decisions.
+Supports both classic and fog of war modes.
 """
 
 from pathlib import Path
@@ -28,8 +29,12 @@ class ContextLoader:
         self.game_history_file = self.country_dir / self.config['paths']['game_history']
         self.game_state_file = self.country_dir / self.config['paths']['game_state']
 
+    def is_fow(self) -> bool:
+        """Check if fog of war mode is enabled."""
+        return self.config.get('features', {}).get('fog_of_war', False)
+
     def load_game_history(self) -> str:
-        """Load the country's fog-of-war filtered game history."""
+        """Load the country's game history."""
         if self.game_history_file.exists():
             return self.game_history_file.read_text()
         return "# Game History\n\nNo game history yet. The game is just beginning!"
@@ -98,9 +103,10 @@ class ContextLoader:
         country_files = self.load_country_files()
         conversations = self.load_conversations()
 
-        # Build the context prompt
-        context = f"""You are playing as {self.country} in a game of Fog of War Diplomacy.
-
+        # Build intro and rules based on mode
+        if self.is_fow():
+            intro = f"You are playing as {self.country} in a game of Fog of War Diplomacy."
+            rules_section = """
 **FOG OF WAR RULES:**
 - You can only see territories adjacent to your HOME supply centers and units
 - Your game_state shows what you currently see
@@ -109,7 +115,14 @@ class ContextLoader:
 - You can READ all conversation history
 
 **IMPORTANT:** If a territory is listed in your game_state without a unit, it is CONFIRMED EMPTY. You have full visibility there - no need to speculate about hidden units.
+"""
+        else:
+            intro = f"You are playing as {self.country} in a game of Diplomacy."
+            rules_section = ""
 
+        # Build the context prompt
+        context = f"""{intro}
+{rules_section}
 **FILE MANAGEMENT:**
 You can create and manage your own files to organize your thoughts however you like.
 <FILE name="filename.md" mode="append|edit|delete">content</FILE>

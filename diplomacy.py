@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Fog of War Diplomacy LLM CLI
-Main interface for running the multi-agent Diplomacy game with fog of war.
+Diplomacy LLM CLI
+Main interface for running the multi-agent Diplomacy game.
+Supports both classic and fog of war modes.
 
 Usage:
     python diplomacy.py <country>         # Run a turn for a specific country
@@ -13,34 +14,31 @@ Usage:
 """
 
 import sys
-import yaml
 from pathlib import Path
-from agent import DiplomacyAgent, get_all_countries
+from agent import DiplomacyAgent
 import google.generativeai as genai
 from dotenv import load_dotenv
 import os
 
-
-def load_config(config_path: str = "config.yaml"):
-    """Load configuration including current season."""
-    with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
+from utils import (
+    load_config,
+    is_fow,
+    get_current_season,
+    get_all_countries,
+    find_country,
+    print_section_header,
+)
 
 
 def run_country_turn(country: str):
     """Run a single turn for a country."""
     try:
         agent = DiplomacyAgent(country)
-
-        # Load current season from config.yaml
         config = load_config()
-        season = config['game'].get('current_season', 'Unknown')
+        season = get_current_season(config)
 
         print(f"\nCurrent Season: {season}")
-
-        print(f"\n{'='*60}")
-        print(f"{country}'s Turn")
-        print(f"{'='*60}\n")
+        print_section_header(f"{country}'s Turn")
 
         # Take turn and get response
         response_text, actions = agent.take_turn(season)
@@ -71,16 +69,11 @@ def run_reflect(country: str):
     """Run a strategic reflection session for a country."""
     try:
         agent = DiplomacyAgent(country)
-
-        # Load current season from config.yaml
         config = load_config()
-        season = config['game'].get('current_season', 'Unknown')
+        season = get_current_season(config)
 
         print(f"\nCurrent Season: {season}")
-
-        print(f"\n{'='*60}")
-        print(f"{country}'s Strategic Reflection")
-        print(f"{'='*60}\n")
+        print_section_header(f"{country}'s Strategic Reflection")
 
         # Take reflection turn
         response_text, actions = agent.take_reflect_turn()
@@ -109,14 +102,10 @@ def run_reflect(country: str):
 
 def check_readiness():
     """Check if all countries are ready to submit orders."""
-    print("\n" + "="*60)
-    print("READINESS CHECK")
-    print("="*60 + "\n")
-
-    # Load current season from config.yaml
+    print_section_header("READINESS CHECK")
     config = load_config()
-    season = config['game'].get('current_season', 'Unknown')
-
+    season = get_current_season(config)
+    countries = get_all_countries(config)
     cheap_model = config.get('cheap_model', 'gemini-flash-latest')
     print(f"Season: {season}")
     print(f"Checking if countries are ready to submit orders...")
@@ -125,13 +114,10 @@ def check_readiness():
     ready_count = 0
     need_discussion = 0
 
-    for country in get_all_countries():
-        print(f"\n{'='*60}")
-        print(f"{country}")
-        print(f"{'='*60}")
+    for country in countries:
+        print_section_header(country)
         try:
             agent = DiplomacyAgent(country)
-            # check_readiness uses cheap model from config by default
             response = agent.check_readiness()
             print(response)
 
@@ -144,23 +130,16 @@ def check_readiness():
         except Exception as e:
             print(f"✗ Error checking {country}: {e}")
 
-    print(f"\n{'='*60}")
-    print("SUMMARY")
-    print(f"{'='*60}")
-    print(f"Ready: {ready_count}/{len(get_all_countries())}")
-    print(f"Need more discussion: {need_discussion}/{len(get_all_countries())}")
-    print()
+    print_section_header("SUMMARY")
+    print(f"Ready: {ready_count}/{len(countries)}")
+    print(f"Need more discussion: {need_discussion}/{len(countries)}")
 
 
 def overseer():
     """Analyze all conversations for loose ends and unresolved discussions."""
-    print("\n" + "="*60)
-    print("OVERSEER ANALYSIS")
-    print("="*60 + "\n")
-
-    # Load current season from config.yaml
+    print_section_header("OVERSEER ANALYSIS")
     config = load_config()
-    season = config['game'].get('current_season', 'Unknown')
+    season = get_current_season(config)
     cheap_model_name = config.get('cheap_model', 'gemini-flash-latest')
 
     print(f"Season: {season}")
@@ -227,13 +206,10 @@ Be concise and focus on actionable insights."""
 
 def collect_orders():
     """Collect orders from all countries."""
-    print("\n" + "="*60)
-    print("COLLECTING ORDERS FROM ALL COUNTRIES")
-    print("="*60 + "\n")
-
-    # Load current season from config.yaml
+    print_section_header("COLLECTING ORDERS FROM ALL COUNTRIES")
     config = load_config()
-    season = f"{config['game'].get('current_season', 'Unknown')} - Orders"
+    season = f"{get_current_season(config)} - Orders"
+    countries = get_all_countries(config)
 
     print(f"Season: {season}\n")
 
@@ -241,7 +217,7 @@ def collect_orders():
     with open(orders_file, 'w') as f:
         f.write(f"# Orders for {season}\n\n")
 
-        for country in get_all_countries():
+        for country in countries:
             print(f"\nGetting orders from {country}...")
             try:
                 agent = DiplomacyAgent(country)
@@ -262,11 +238,9 @@ def collect_orders():
 
 def cleanup():
     """Remove all conversations and country files to reset the game."""
-    print("\n" + "="*60)
-    print("CLEANUP - RESETTING GAME FILES")
-    print("="*60 + "\n")
-
+    print_section_header("CLEANUP - RESETTING GAME FILES")
     config = load_config()
+    countries = get_all_countries(config)
 
     # Clear conversations
     conv_dir = Path("conversations")
@@ -280,7 +254,7 @@ def cleanup():
         print("- No conversations directory")
 
     # Clear country folders
-    for country in get_all_countries():
+    for country in countries:
         country_dir = Path(country)
         if country_dir.exists():
             count = 0
@@ -296,16 +270,27 @@ def cleanup():
 
 
 def show_status():
-    print("\n" + "="*60)
-    print("FOG OF WAR DIPLOMACY - GAME STATUS")
-    print("="*60 + "\n")
-
-    # Show current game state from config.yaml
+    """Show current game status."""
     config = load_config()
-    print(f"Current Season: {config['game'].get('current_season', 'Unknown')}")
+    fow_enabled = is_fow(config)
+    countries = get_all_countries(config)
+    mode_name = "Fog of War" if fow_enabled else "Classic"
+
+    print_section_header(f"DIPLOMACY LLM - GAME STATUS ({mode_name} Mode)")
+
+    print(f"Current Season: {get_current_season(config)}")
     if config['game'].get('notes'):
         print(f"Notes: {config['game'].get('notes')}")
     print()
+
+    # In classic mode, check for shared game_state.md
+    if not fow_enabled:
+        shared_state = Path(config['paths']['data_dir']) / 'game_state.md'
+        if shared_state.exists() and shared_state.stat().st_size > 50:
+            print("Shared game_state.md: ✓ exists")
+        else:
+            print("Shared game_state.md: - needs content")
+        print()
 
     # Check conversations directory
     conv_dir = Path("conversations")
@@ -313,36 +298,36 @@ def show_status():
         conv_files = list(conv_dir.glob("*.md"))
         print(f"Active Conversations: {len(conv_files)}")
         for conv_file in sorted(conv_files):
-            # Count messages
             content = conv_file.read_text()
-            msg_count = content.count('**')  // 2  # Rough estimate
+            msg_count = content.count('**') // 2  # Rough estimate
             print(f"  - {conv_file.stem}: ~{msg_count} messages")
     else:
         print("Active Conversations: 0")
 
     print()
 
-    for country in get_all_countries():
+    for country in countries:
         country_dir = Path(country)
         print(f"{country}:")
 
         if not country_dir.exists():
-            print(f"  ! Directory not found - run initialize_game.py")
+            print("  ! Directory not found - run initialize_game.py")
             continue
 
-        # Check game_state
-        game_state_file = country_dir / config['paths']['game_state']
-        if game_state_file.exists() and game_state_file.stat().st_size > 100:
-            print(f"  ✓ Has game_state.md")
-        else:
-            print(f"  - game_state.md needs content")
+        # Check game_state (only in FoW mode)
+        if fow_enabled:
+            game_state_file = country_dir / config['paths']['game_state']
+            if game_state_file.exists() and game_state_file.stat().st_size > 100:
+                print("  ✓ Has game_state.md")
+            else:
+                print("  - game_state.md needs content")
 
         # Check game_history
         game_history_file = country_dir / config['paths']['game_history']
         if game_history_file.exists() and game_history_file.stat().st_size > 100:
-            print(f"  ✓ Has game_history.md")
+            print("  ✓ Has game_history.md")
         else:
-            print(f"  - game_history.md needs content")
+            print("  - game_history.md needs content")
 
         # List other files
         other_files = [f.name for f in country_dir.glob("*.md")
@@ -354,8 +339,11 @@ def show_status():
 
 
 def main():
+    config = load_config()
+    countries = get_all_countries(config)
+
     if len(sys.argv) < 2:
-        print("Fog of War Diplomacy CLI")
+        print("Diplomacy LLM CLI")
         print()
         print("Usage:")
         print("  python diplomacy.py <country>         # Run a turn for a country")
@@ -365,7 +353,7 @@ def main():
         print("  python diplomacy.py orders            # Collect orders from all countries")
         print("  python diplomacy.py status            # Show game status")
         print("  python diplomacy.py cleanup           # Remove all game files (reset)")
-        print(f"\nCountries: {', '.join(get_all_countries())}")
+        print(f"\nCountries: {', '.join(countries)}")
         sys.exit(1)
 
     command = sys.argv[1].lower()
@@ -384,31 +372,17 @@ def main():
     elif command == "reflect":
         if len(sys.argv) < 3:
             print("Usage: python diplomacy.py reflect <country>")
-            print(f"Countries: {', '.join(get_all_countries())}")
+            print(f"Countries: {', '.join(countries)}")
             sys.exit(1)
-        country_name = sys.argv[2]
-        # Find country (case-insensitive)
-        countries = get_all_countries()
-        country = None
-        for c in countries:
-            if c.lower() == country_name.lower():
-                country = c
-                break
+        country = find_country(sys.argv[2], countries)
         if country is None:
-            print(f"Error: '{country_name}' is not a recognized country")
+            print(f"Error: '{sys.argv[2]}' is not a recognized country")
             print(f"Countries: {', '.join(countries)}")
             sys.exit(1)
         run_reflect(country)
     else:
         # Assume it's a country name
-        countries = get_all_countries()
-        # Find country (case-insensitive)
-        country = None
-        for c in countries:
-            if c.lower() == command:
-                country = c
-                break
-
+        country = find_country(command, countries)
         if country is None:
             print(f"Error: '{command}' is not a recognized command or country")
             print(f"Countries: {', '.join(countries)}")

@@ -1,4 +1,8 @@
-# Diplomacy LLM Configuration - Fog of War Edition
+# Diplomacy LLM Configuration
+
+# Feature flags
+features:
+  fog_of_war: true  # Set to false for classic mode (shared game state)
 
 # Countries in the game
 countries:
@@ -16,7 +20,7 @@ cheap_model: gemini-flash-latest  # Cheap model for readiness/orders
 
 # Game settings
 game:
-  current_season: Spring 1901  # Update this as the game progresses
+  current_season: Spring 1902  # Update this as the game progresses
   notes: ""  # Optional notes about current game state
 
 # File paths
