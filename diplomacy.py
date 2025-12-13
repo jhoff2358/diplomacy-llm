@@ -7,6 +7,7 @@ Supports both classic and fog of war modes.
 Usage:
     python diplomacy.py <country>         # Run a turn for a specific country
     python diplomacy.py reflect <country> # Strategic reflection session
+    python diplomacy.py season            # Run a full season (turns + readiness + orders)
     python diplomacy.py readiness         # Check if countries are ready to submit orders
     python diplomacy.py overseer          # Check for loose ends in all conversations
     python diplomacy.py orders            # Collect orders from all countries
@@ -14,6 +15,7 @@ Usage:
 """
 
 import sys
+import random
 from pathlib import Path
 from agent import DiplomacyAgent
 import google.generativeai as genai
@@ -236,6 +238,75 @@ def collect_orders():
     print(f"\n✓ All orders saved to {orders_file}")
 
 
+def run_season():
+    """Run a full season: turns, readiness check, and orders collection."""
+    config = load_config()
+    season = get_current_season(config)
+    countries = get_all_countries(config)
+    turn_rounds = config.get('season', {}).get('turn_rounds', 2)
+
+    print_section_header(f"RUNNING SEASON: {season}")
+    print(f"Countries: {', '.join(countries)}")
+    print(f"Turn rounds before readiness check: {turn_rounds}\n")
+
+    # Run initial turn rounds
+    for round_num in range(1, turn_rounds + 1):
+        print_section_header(f"TURN ROUND {round_num}/{turn_rounds}")
+
+        # Randomize country order
+        shuffled = countries.copy()
+        random.shuffle(shuffled)
+        print(f"Order: {', '.join(shuffled)}\n")
+
+        for country in shuffled:
+            run_country_turn(country)
+            print()
+
+    # Check readiness loop
+    while True:
+        print_section_header("READINESS CHECK")
+        ready_countries = []
+        not_ready_countries = []
+
+        for country in countries:
+            try:
+                agent = DiplomacyAgent(country)
+                response = agent.check_readiness()
+                print(f"{country}: {response[:100]}...")
+
+                if "READY" in response.upper() and "NEED MORE" not in response.upper():
+                    ready_countries.append(country)
+                else:
+                    not_ready_countries.append(country)
+
+            except Exception as e:
+                print(f"✗ Error checking {country}: {e}")
+                not_ready_countries.append(country)
+
+        print(f"\nReady: {len(ready_countries)}/{len(countries)}")
+
+        if len(ready_countries) == len(countries):
+            print("All countries ready! Collecting orders...")
+            break
+        else:
+            print(f"Not ready: {', '.join(not_ready_countries)}")
+            print("\nRunning another round of turns...")
+
+            # Run another round with randomized order
+            shuffled = countries.copy()
+            random.shuffle(shuffled)
+            print(f"Order: {', '.join(shuffled)}\n")
+
+            for country in shuffled:
+                run_country_turn(country)
+                print()
+
+    # Collect orders
+    collect_orders()
+    print_section_header("SEASON COMPLETE")
+    print(f"Season {season} finished. Orders saved to orders.md")
+
+
 def cleanup():
     """Remove all conversations and country files to reset the game."""
     print_section_header("CLEANUP - RESETTING GAME FILES")
@@ -358,6 +429,7 @@ def main():
         print("Usage:")
         print("  python diplomacy.py <country>         # Run a turn for a country")
         print("  python diplomacy.py reflect <country> # Strategic reflection session")
+        print("  python diplomacy.py season            # Run full season (turns + readiness + orders)")
         print("  python diplomacy.py readiness         # Check if countries are ready for orders")
         print("  python diplomacy.py overseer          # Analyze conversations for loose ends")
         print("  python diplomacy.py orders            # Collect orders from all countries")
@@ -369,7 +441,9 @@ def main():
     command = sys.argv[1].lower()
 
     # Special commands
-    if command == "readiness":
+    if command == "season":
+        run_season()
+    elif command == "readiness":
         check_readiness()
     elif command == "overseer":
         overseer()

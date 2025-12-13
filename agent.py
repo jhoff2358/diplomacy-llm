@@ -7,13 +7,16 @@ Supports both classic and fog of war modes.
 import os
 import re
 import shutil
+import time
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple, TypeVar
 import google.generativeai as genai
 from dotenv import load_dotenv
 import yaml
 
 from context import ContextLoader
+
+T = TypeVar('T')
 
 
 # Files that cannot be modified by the agent
@@ -46,6 +49,24 @@ class DiplomacyAgent:
 
         # Country directory
         self.country_dir = Path(self.config['paths']['data_dir']) / country
+
+        # Retry settings
+        self.max_retries = self.config.get('api', {}).get('max_retries', 2)
+
+    def _retry(self, fn: Callable[[], T], description: str = "API call") -> T:
+        """Retry a function up to max_retries times on failure."""
+        last_error = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                return fn()
+            except Exception as e:
+                last_error = e
+                if attempt < self.max_retries:
+                    wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s...
+                    print(f"  ! {description} failed (attempt {attempt + 1}/{self.max_retries + 1}): {e}")
+                    print(f"    Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+        raise last_error
 
     def is_fow(self) -> bool:
         """Check if fog of war mode is enabled."""
@@ -83,7 +104,9 @@ class DiplomacyAgent:
 
 ---
 
-What would you like to do this turn?"""
+What would you like to do this turn? You may send messages, update your notes, or both.
+
+If you have nothing to add right now, simply respond with **PASS** - there's no need to act on every turn."""
 
         return initial_prompt
 
@@ -186,8 +209,11 @@ Reflect on the past year and prepare for the next:"""
         self.sync_shared_files()  # Copy shared files in classic mode
         prompt = self.initialize_session()
 
-        # Get response from LLM
-        response = self.chat.send_message(prompt)
+        # Get response from LLM with retry
+        response = self._retry(
+            lambda: self.chat.send_message(prompt),
+            f"{self.country} turn"
+        )
         response_text = response.text
 
         # Parse actions
@@ -200,8 +226,11 @@ Reflect on the past year and prepare for the next:"""
         self.sync_shared_files()  # Copy shared files in classic mode
         prompt = self.initialize_reflect_session()
 
-        # Get response from LLM
-        response = self.chat.send_message(prompt)
+        # Get response from LLM with retry
+        response = self._retry(
+            lambda: self.chat.send_message(prompt),
+            f"{self.country} reflect"
+        )
         response_text = response.text
 
         # Parse actions but filter out messages (reflection is private)
@@ -289,15 +318,30 @@ Reflect on the past year and prepare for the next:"""
 
         prompt = f"""{context}
 
-Before we collect orders, I want to check: Are you ready to submit orders for this phase, or do you feel there is more diplomatic discussion needed first?
+---
 
-Please respond briefly with:
-1. Your readiness status (READY or NEED MORE DISCUSSION)
-2. A short 1-2 sentence explanation
+**READINESS CHECK**
 
-Do not use XML tags for this response, just answer directly."""
+Before we collect orders, I need to check if you're ready. Consider:
 
-        response = chat.send_message(prompt)
+1. Are there any unanswered questions in your conversations that could affect your strategy?
+2. Are there pending negotiations or proposals you're waiting on?
+3. Do you have enough information to confidently submit orders?
+
+It's perfectly fine to request more discussion time. Don't just say READY to be agreeable - if there's genuine uncertainty or an important conversation that hasn't concluded, say so.
+
+Respond with:
+- **READY** - if you have enough clarity to submit orders
+- **NEED MORE DISCUSSION** - if there are unresolved questions or pending negotiations
+
+Then briefly explain why (1-2 sentences).
+
+Do not use XML tags. Just answer directly."""
+
+        response = self._retry(
+            lambda: chat.send_message(prompt),
+            f"{self.country} readiness check"
+        )
         return response.text.strip()
 
     def get_orders(self) -> str:
@@ -313,11 +357,23 @@ Do not use XML tags for this response, just answer directly."""
 
         prompt = f"""{context}
 
-It is time to submit your orders for this phase.
+---
 
-Please provide your orders for all your units. Be specific and clear about what each unit should do.
+**ORDERS PHASE**
 
-Your orders:"""
+It is time to submit your orders for this phase. Output ONLY your orders, one per line, using standard Diplomacy notation.
 
-        response = chat.send_message(prompt)
+Examples:
+- A Par - Bur (Army Paris moves to Burgundy)
+- F Lon - NTH (Fleet London moves to North Sea)
+- A Mun S A Par - Bur (Army Munich supports Army Paris to Burgundy)
+- F NTH C A Lon - Bel (Fleet North Sea convoys Army London to Belgium)
+- A Vie H (Army Vienna holds)
+
+Do NOT include any messages, file operations, or other commentary. Output only your orders."""
+
+        response = self._retry(
+            lambda: chat.send_message(prompt),
+            f"{self.country} orders"
+        )
         return response.text

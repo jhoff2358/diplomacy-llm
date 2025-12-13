@@ -12,13 +12,16 @@ import yaml
 class ContextLoader:
     """Loads context for a specific country from their files."""
 
-    def __init__(self, country: str, config_path: str = "config.yaml", conversation_line_limit: Optional[int] = None):
+    def __init__(self, country: str, config_path: str = "config.yaml"):
         self.country = country
-        self.conversation_line_limit = conversation_line_limit
 
         # Load config
         with open(config_path, 'r') as f:
             self.config = yaml.safe_load(f)
+
+        # Get conversation line limit from config (0 or negative = no limit)
+        limit = self.config.get('context', {}).get('conversation_line_limit', 0)
+        self.conversation_line_limit = limit if limit > 0 else None
 
         # Set up paths
         self.data_dir = Path(self.config['paths']['data_dir'])
@@ -85,11 +88,11 @@ class ContextLoader:
                     label = '-'.join(other_participants)
                     content = conv_file.read_text()
 
-                    # Apply line limit if set
+                    # Apply line limit if set (take last N lines)
                     if self.conversation_line_limit is not None:
                         lines = content.split('\n')
                         if len(lines) > self.conversation_line_limit:
-                            content = '\n'.join(lines[-self.conversation_line_limit:])
+                            content = f"[... earlier messages truncated ...]\n\n" + '\n'.join(lines[-self.conversation_line_limit:])
 
                     conversations[label] = content
 

@@ -25,7 +25,19 @@ game:
 # File paths
 paths:
   data_dir: countries  # All game data (country folders, conversations, shared files)
-  shared_conversations_dir: conversations  # Relative to data_dir
+  shared_conversations_dir: _conversations  # Relative to data_dir (underscore keeps it sorted first)
   # Per-country files (relative to country directory)
   game_history: game_history.md
   game_state: game_state.md
+
+# Context settings
+context:
+  conversation_line_limit: 0  # Max lines per conversation (0 = no limit)
+
+# API settings
+api:
+  max_retries: 2  # Number of retries if API call fails
+
+# Season settings
+season:
+  turn_rounds: 2  # Number of turn rounds before checking readiness
