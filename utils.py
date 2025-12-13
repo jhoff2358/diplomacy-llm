@@ -20,8 +20,33 @@ def is_fow(config: dict) -> bool:
 
 
 def get_current_season(config: dict) -> str:
-    """Get the current season from config."""
-    return config['game'].get('current_season', 'Unknown')
+    """Get the current season from game_state.md.
+
+    Reads the first line of game_state.md (or shared game_state.md in classic mode).
+    Expected format: 'Season: Spring 1901' or just 'Spring 1901'
+    """
+    data_dir = Path(config['paths']['data_dir'])
+
+    # In classic mode, read from root; in FoW mode, pick any country's file
+    if is_fow(config):
+        # Use first country's game_state
+        countries = config.get('countries', [])
+        if countries:
+            game_state_path = data_dir / countries[0] / config['paths']['game_state']
+        else:
+            return 'Unknown'
+    else:
+        game_state_path = data_dir / 'game_state.md'
+
+    if not game_state_path.exists():
+        return 'Unknown'
+
+    first_line = game_state_path.read_text().split('\n')[0].strip()
+
+    # Handle "Season: Spring 1901" or just "Spring 1901"
+    if first_line.lower().startswith('season:'):
+        return first_line.split(':', 1)[1].strip()
+    return first_line if first_line else 'Unknown'
 
 
 def get_all_countries(config: dict) -> List[str]:

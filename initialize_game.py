@@ -1,25 +1,34 @@
 #!/usr/bin/env python3
 """
 Initialize Diplomacy game.
-Creates per-country directories with game_history.md templates.
-In FoW mode, also creates per-country game_state.md.
-In classic mode, creates a single shared game_state.md in root.
+In FoW mode, creates per-country game_state.md and game_history.md.
+In classic mode, creates shared game_state.md and game_history.md in root,
+which get copied to country folders on each turn.
 """
 
 from pathlib import Path
 from utils import load_config, is_fow, get_all_countries
 
 
-def create_game_history_template(country: str, fow_enabled: bool) -> str:
-    """Create empty game history template for a country."""
-    if fow_enabled:
-        description = "This file tracks the orders and results you have witnessed.\nUpdated manually by the game master with fog-of-war filtered information."
-    else:
-        description = "This file tracks the orders and results of the game.\nUpdated manually by the game master."
-
+def create_game_history_template(country: str) -> str:
+    """Create empty game history template for a country (FoW mode)."""
     return f"""# Game History - {country}
 
-{description}
+This file tracks the orders and results you have witnessed.
+Updated manually by the game master with fog-of-war filtered information.
+
+## Spring 1901
+
+*No orders yet - the game is just beginning!*
+"""
+
+
+def create_shared_game_history_template() -> str:
+    """Create shared game history template (classic mode)."""
+    return """# Game History
+
+This file tracks the orders and results of the game.
+Updated manually by the game master.
 
 ## Spring 1901
 
@@ -29,9 +38,9 @@ def create_game_history_template(country: str, fow_enabled: bool) -> str:
 
 def create_game_state_template(country: str) -> str:
     """Create empty game state template for a country (FoW mode)."""
-    return f"""# Current Game State - {country}
+    return f"""Spring 1901
 
-Season: Spring 1901
+# Current Game State - {country}
 
 ## Permanent Home SC Visibility
 ## Supply Centers you control marked with an asterisk. Assume provinces do not contain units unless explicitly specified
@@ -46,9 +55,9 @@ None yet
 
 def create_shared_game_state_template() -> str:
     """Create shared game state template (classic mode)."""
-    return """# Current Game State
+    return """Spring 1901
 
-Season: Spring 1901
+# Current Game State
 
 ## Supply Centers
 *To be filled in by game master*
@@ -73,28 +82,28 @@ def main():
     conversations_dir.mkdir(parents=True, exist_ok=True)
     print(f"✓ Created {conversations_dir}/")
 
-    # Create per-country directories and files
+    # Create per-country directories
     for country in countries:
         country_dir = data_dir / country
         country_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create game_history.md (both modes)
-        game_history_file = country_dir / config['paths']['game_history']
-        game_history_file.write_text(create_game_history_template(country, fow_enabled))
-
         if fow_enabled:
-            # FoW mode: create per-country game_state.md
+            # FoW mode: create per-country game_state.md and game_history.md
             game_state_file = country_dir / config['paths']['game_state']
             game_state_file.write_text(create_game_state_template(country))
+            game_history_file = country_dir / config['paths']['game_history']
+            game_history_file.write_text(create_game_history_template(country))
             print(f"✓ Created {country}/ with game_history.md and game_state.md")
         else:
-            print(f"✓ Created {country}/ with game_history.md")
+            print(f"✓ Created {country}/")
 
     if not fow_enabled:
-        # Classic mode: create single shared game_state.md in root
+        # Classic mode: create single shared game_state.md and game_history.md in root
         shared_game_state = data_dir / 'game_state.md'
         shared_game_state.write_text(create_shared_game_state_template())
-        print(f"✓ Created shared game_state.md")
+        shared_game_history = data_dir / 'game_history.md'
+        shared_game_history.write_text(create_shared_game_history_template())
+        print(f"✓ Created shared game_state.md and game_history.md")
 
     print("\n✓ Game initialized!")
     print(f"\nMode: {mode_name}")
@@ -102,7 +111,7 @@ def main():
     if fow_enabled:
         print("  1. Fill in each country's game_state.md with their starting visibility")
     else:
-        print("  1. Fill in the shared game_state.md with the starting game state")
+        print("  1. Fill in the shared game_state.md and game_history.md")
     print("  2. Make sure your .env file has your Gemini API key")
     print("  3. Run: python diplomacy.py status")
     print("  4. Start the game: python diplomacy.py austria")

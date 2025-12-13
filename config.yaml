@@ -2,7 +2,7 @@
 
 # Feature flags
 features:
-  fog_of_war: true  # Set to false for classic mode (shared game state)
+  fog_of_war: false
 
 # Countries in the game
 countries:
@@ -20,7 +20,6 @@ cheap_model: gemini-flash-latest  # Cheap model for readiness/orders
 
 # Game settings
 game:
-  current_season: Spring 1902  # Update this as the game progresses
   notes: ""  # Optional notes about current game state
 
 # File paths

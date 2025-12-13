@@ -51,16 +51,25 @@ class DiplomacyAgent:
         """Check if fog of war mode is enabled."""
         return self.config.get('features', {}).get('fog_of_war', False)
 
-    def sync_shared_game_state(self):
-        """In classic mode, copy root game_state.md to country folder."""
+    def sync_shared_files(self):
+        """In classic mode, copy root game_state.md and game_history.md to country folder."""
         if self.is_fow():
             return  # FoW mode uses per-country files directly
 
-        shared_state = Path(self.config['paths']['data_dir']) / 'game_state.md'
+        self.country_dir.mkdir(parents=True, exist_ok=True)
+        data_dir = Path(self.config['paths']['data_dir'])
+
+        # Copy shared game_state.md
+        shared_state = data_dir / 'game_state.md'
         if shared_state.exists():
             country_state = self.country_dir / self.config['paths']['game_state']
-            self.country_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy(shared_state, country_state)
+
+        # Copy shared game_history.md
+        shared_history = data_dir / 'game_history.md'
+        if shared_history.exists():
+            country_history = self.country_dir / self.config['paths']['game_history']
+            shutil.copy(shared_history, country_history)
 
     def initialize_session(self):
         """Initialize or reset the chat session with current context."""
@@ -174,7 +183,7 @@ Reflect on the past year and prepare for the next:"""
 
     def take_turn(self, season: str = None) -> Tuple[str, Dict[str, Any]]:
         """Take a turn: show context and get LLM response."""
-        self.sync_shared_game_state()  # Copy shared state in classic mode
+        self.sync_shared_files()  # Copy shared files in classic mode
         prompt = self.initialize_session()
 
         # Get response from LLM
@@ -188,7 +197,7 @@ Reflect on the past year and prepare for the next:"""
 
     def take_reflect_turn(self) -> Tuple[str, Dict[str, Any]]:
         """Take a reflection turn focused on strategic thinking."""
-        self.sync_shared_game_state()  # Copy shared state in classic mode
+        self.sync_shared_files()  # Copy shared files in classic mode
         prompt = self.initialize_reflect_session()
 
         # Get response from LLM
@@ -266,7 +275,7 @@ Reflect on the past year and prepare for the next:"""
             model_override: Optional model name to use instead of config default.
                           Defaults to cheap_model from config to save costs.
         """
-        self.sync_shared_game_state()  # Copy shared state in classic mode
+        self.sync_shared_files()  # Copy shared files in classic mode
         context = self.context_loader.format_context()
 
         # Use override model if provided, otherwise use cheap model from config
@@ -295,7 +304,7 @@ Do not use XML tags for this response, just answer directly."""
         """Ask the agent for their orders for this phase.
         Uses cheap model from config to save costs.
         """
-        self.sync_shared_game_state()  # Copy shared state in classic mode
+        self.sync_shared_files()  # Copy shared files in classic mode
         context = self.context_loader.format_context()
 
         # Create a fresh chat for orders using cheap model
