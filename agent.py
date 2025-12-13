@@ -1,5 +1,5 @@
 """
-Agent manager for Diplomacy countries.
+Agent manager for Fog of War Diplomacy countries.
 Manages Gemini chat sessions and handles country actions.
 """
 
@@ -12,6 +12,10 @@ from dotenv import load_dotenv
 import yaml
 
 from context import ContextLoader
+
+
+# Files that cannot be modified by the agent
+RESERVED_FILES = {'game_history.md', 'game_state.md'}
 
 
 class DiplomacyAgent:
@@ -51,34 +55,36 @@ class DiplomacyAgent:
         # Send initial context as system-like message
         initial_prompt = f"""{context}
 
-Each turn, you may:
-- Send a message to one or more countries
-- Update your notes and/or plans
-
-To send a message, use this format:
-<MESSAGE to="Country">
-Your message here
-</MESSAGE>
-
-For group messages, separate countries with commas:
-<MESSAGE to="Austria,Germany">
-Your group message here
-</MESSAGE>
-
-To update your plans, use:
-<PLANS>
-Your complete updated plans here (this will replace the entire file)
-</PLANS>
-
-To update your notes, use:
-<NOTES>
-Your complete updated notes here (this will replace the entire file)
-</NOTES>
-
-You can include multiple messages and update both plans and notes in a single turn.
-If you don't want to take any action this turn, just say so without using any tags.
+---
 
 What would you like to do this turn?"""
+
+        return initial_prompt
+
+    def initialize_reflect_session(self):
+        """Initialize a reflection session focused on strategic thinking."""
+        context = self.context_loader.format_context()
+
+        # Start new chat with full context
+        self.chat = self.model.start_chat(history=[])
+
+        initial_prompt = f"""You are playing as {self.country}. This is a STRATEGIC REFLECTION session.
+
+Take time to:
+1. Analyze your current position and trajectory
+2. Evaluate your alliances and diplomatic relationships
+3. Plan your next 2-3 seasons
+4. Reorganize your files if needed (use mode="edit" or mode="delete")
+
+This is a time for thinking and planning, not diplomacy.
+
+---
+
+{context}
+
+---
+
+Reflect on your strategy:"""
 
         return initial_prompt
 
@@ -86,8 +92,7 @@ What would you like to do this turn?"""
         """Parse XML-style tags from LLM response."""
         actions = {
             'messages': [],
-            'plans': None,
-            'notes': None
+            'files': []
         }
 
         # Parse MESSAGE tags
@@ -104,17 +109,19 @@ What would you like to do this turn?"""
                 'content': message_content
             })
 
-        # Parse PLANS tag
-        plans_pattern = r'<PLANS\s*>(.*?)</PLANS>'
-        plans_match = re.search(plans_pattern, response_text, re.DOTALL | re.IGNORECASE)
-        if plans_match:
-            actions['plans'] = plans_match.group(1).strip()
+        # Parse FILE tags
+        # Supports: <FILE name="x.md">, <FILE name="x.md" mode="append">, etc.
+        file_pattern = r'<FILE\s+name="([^"]+)"(?:\s+mode="([^"]+)")?\s*>(.*?)</FILE>'
+        for match in re.finditer(file_pattern, response_text, re.DOTALL | re.IGNORECASE):
+            filename = match.group(1)
+            mode = match.group(2) or 'append'  # Default to append
+            content = match.group(3).strip()
 
-        # Parse NOTES tag
-        notes_pattern = r'<NOTES\s*>(.*?)</NOTES>'
-        notes_match = re.search(notes_pattern, response_text, re.DOTALL | re.IGNORECASE)
-        if notes_match:
-            actions['notes'] = notes_match.group(1).strip()
+            actions['files'].append({
+                'name': filename,
+                'mode': mode.lower(),
+                'content': content
+            })
 
         return actions
 
@@ -124,13 +131,9 @@ What would you like to do this turn?"""
         for msg in actions['messages']:
             self.send_message(msg['to'], msg['content'], season)
 
-        # Update plans
-        if actions['plans'] is not None:
-            self.update_plans(actions['plans'])
-
-        # Update notes
-        if actions['notes'] is not None:
-            self.update_notes(actions['notes'])
+        # Handle file operations
+        for file_op in actions['files']:
+            self.write_file(file_op['name'], file_op['content'], file_op['mode'])
 
     def take_turn(self, season: str = None) -> Tuple[str, Dict[str, any]]:
         """Take a turn: show context and get LLM response."""
@@ -141,6 +144,19 @@ What would you like to do this turn?"""
         response_text = response.text
 
         # Parse actions
+        actions = self.parse_response(response_text)
+
+        return response_text, actions
+
+    def take_reflect_turn(self) -> Tuple[str, Dict[str, any]]:
+        """Take a reflection turn focused on strategic thinking."""
+        prompt = self.initialize_reflect_session()
+
+        # Get response from LLM
+        response = self.chat.send_message(prompt)
+        response_text = response.text
+
+        # Parse actions (only file operations expected, but parse all)
         actions = self.parse_response(response_text)
 
         return response_text, actions
@@ -164,17 +180,44 @@ What would you like to do this turn?"""
         recipients_str = ', '.join(recipients)
         print(f"  ✓ Message sent to {recipients_str}")
 
-    def update_plans(self, new_plans: str):
-        """Update the plans file."""
-        plans_file = self.country_dir / self.config['paths']['plans_file']
-        plans_file.write_text(new_plans)
-        print(f"  ✓ Plans updated")
+    def write_file(self, filename: str, content: str, mode: str):
+        """Write/append/delete a file in the country directory."""
 
-    def update_notes(self, new_notes: str):
-        """Update the notes file."""
-        notes_file = self.country_dir / self.config['paths']['notes_file']
-        notes_file.write_text(new_notes)
-        print(f"  ✓ Notes updated")
+        # Validate filename
+        if not filename.endswith('.md'):
+            print(f"  ✗ Invalid filename '{filename}' - must end with .md")
+            return
+
+        if filename in RESERVED_FILES:
+            print(f"  ✗ Cannot modify reserved file '{filename}'")
+            return
+
+        file_path = self.country_dir / filename
+
+        if mode == 'delete':
+            if file_path.exists():
+                file_path.unlink()
+                print(f"  ✓ Deleted {filename}")
+            else:
+                print(f"  ! File {filename} does not exist")
+
+        elif mode == 'edit':
+            file_path.write_text(content)
+            print(f"  ✓ Replaced {filename}")
+
+        elif mode == 'append':
+            # Append with newlines
+            if file_path.exists():
+                existing = file_path.read_text()
+                if existing and not existing.endswith('\n'):
+                    existing += '\n'
+                file_path.write_text(existing + content + '\n')
+            else:
+                file_path.write_text(content + '\n')
+            print(f"  ✓ Appended to {filename}")
+
+        else:
+            print(f"  ✗ Unknown mode '{mode}' - use append, edit, or delete")
 
     def check_readiness(self, model_override: str = None) -> str:
         """Ask the agent if they're ready to submit orders or need more discussion.

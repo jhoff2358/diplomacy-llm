@@ -1,4 +1,4 @@
-# Diplomacy LLM Configuration
+# Diplomacy LLM Configuration - Fog of War Edition
 
 # Countries in the game
 countries:
@@ -16,13 +16,13 @@ cheap_model: gemini-flash-latest  # Cheap model for readiness/orders
 
 # Game settings
 game:
-  current_season: Fall 1902  # Update this as the game progresses
+  current_season: Spring 1901  # Update this as the game progresses
   notes: ""  # Optional notes about current game state
 
 # File paths
 paths:
   data_dir: .
   shared_conversations_dir: conversations  # Shared by all countries
-  shared_game_history: game_history.md  # Shared by all countries
-  plans_file: plans.md
-  notes_file: notes.md
+  # Per-country files (relative to country directory)
+  game_history: game_history.md
+  game_state: game_state.md

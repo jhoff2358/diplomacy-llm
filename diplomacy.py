@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-Diplomacy LLM CLI
-Main interface for running the multi-agent Diplomacy game.
+Fog of War Diplomacy LLM CLI
+Main interface for running the multi-agent Diplomacy game with fog of war.
 
 Usage:
-    python diplomacy.py <country>     # Run a turn for a specific country
-    python diplomacy.py readiness     # Check if countries are ready to submit orders
-    python diplomacy.py overseer      # Check for loose ends in all conversations
-    python diplomacy.py orders        # Collect orders from all countries
-    python diplomacy.py status        # Show current game status
+    python diplomacy.py <country>         # Run a turn for a specific country
+    python diplomacy.py reflect <country> # Strategic reflection session
+    python diplomacy.py readiness         # Check if countries are ready to submit orders
+    python diplomacy.py overseer          # Check for loose ends in all conversations
+    python diplomacy.py orders            # Collect orders from all countries
+    python diplomacy.py status            # Show current game status
 """
 
 import sys
@@ -51,9 +52,7 @@ def run_country_turn(country: str):
         print("-" * 60)
 
         # Execute actions if any were parsed
-        has_actions = (actions['messages'] or
-                      actions['plans'] is not None or
-                      actions['notes'] is not None)
+        has_actions = (actions['messages'] or actions['files'])
 
         if has_actions:
             print(f"\nExecuting actions:")
@@ -61,6 +60,46 @@ def run_country_turn(country: str):
             print(f"\n✓ Turn complete")
         else:
             print(f"\nNo actions taken this turn.")
+
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def run_reflect(country: str):
+    """Run a strategic reflection session for a country."""
+    try:
+        agent = DiplomacyAgent(country)
+
+        # Load current season from config.yaml
+        config = load_config()
+        season = config['game'].get('current_season', 'Unknown')
+
+        print(f"\nCurrent Season: {season}")
+
+        print(f"\n{'='*60}")
+        print(f"{country}'s Strategic Reflection")
+        print(f"{'='*60}\n")
+
+        # Take reflection turn
+        response_text, actions = agent.take_reflect_turn()
+
+        # Show LLM's response
+        print(f"{country} reflects:")
+        print("-" * 60)
+        print(response_text)
+        print("-" * 60)
+
+        # Execute file actions only (messages during reflection are discouraged but allowed)
+        has_actions = (actions['messages'] or actions['files'])
+
+        if has_actions:
+            print(f"\nExecuting actions:")
+            agent.execute_actions(actions, season)
+            print(f"\n✓ Reflection complete")
+        else:
+            print(f"\nNo file updates during reflection.")
 
     except Exception as e:
         print(f"Error: {e}")
@@ -111,6 +150,7 @@ def check_readiness():
     print(f"Ready: {ready_count}/{len(get_all_countries())}")
     print(f"Need more discussion: {need_discussion}/{len(get_all_countries())}")
     print()
+
 
 def overseer():
     """Analyze all conversations for loose ends and unresolved discussions."""
@@ -184,6 +224,7 @@ Be concise and focus on actionable insights."""
     print(response.text)
     print()
 
+
 def collect_orders():
     """Collect orders from all countries."""
     print("\n" + "="*60)
@@ -219,10 +260,44 @@ def collect_orders():
     print(f"\n✓ All orders saved to {orders_file}")
 
 
-def show_status():
-    """Show current game status."""
+def cleanup():
+    """Remove all conversations and country files to reset the game."""
     print("\n" + "="*60)
-    print("GAME STATUS")
+    print("CLEANUP - RESETTING GAME FILES")
+    print("="*60 + "\n")
+
+    config = load_config()
+
+    # Clear conversations
+    conv_dir = Path("conversations")
+    if conv_dir.exists():
+        count = 0
+        for conv_file in conv_dir.glob("*.md"):
+            conv_file.unlink()
+            count += 1
+        print(f"✓ Removed {count} conversation files")
+    else:
+        print("- No conversations directory")
+
+    # Clear country folders
+    for country in get_all_countries():
+        country_dir = Path(country)
+        if country_dir.exists():
+            count = 0
+            for md_file in country_dir.glob("*.md"):
+                md_file.unlink()
+                count += 1
+            print(f"✓ Removed {count} files from {country}/")
+        else:
+            print(f"- No {country}/ directory")
+
+    print("\n✓ Cleanup complete!")
+    print("\nRun 'python initialize_game.py' to set up a fresh game.")
+
+
+def show_status():
+    print("\n" + "="*60)
+    print("FOG OF WAR DIPLOMACY - GAME STATUS")
     print("="*60 + "\n")
 
     # Show current game state from config.yaml
@@ -237,7 +312,7 @@ def show_status():
     if conv_dir.exists():
         conv_files = list(conv_dir.glob("*.md"))
         print(f"Active Conversations: {len(conv_files)}")
-        for conv_file in conv_files:
+        for conv_file in sorted(conv_files):
             # Count messages
             content = conv_file.read_text()
             msg_count = content.count('**')  // 2  # Rough estimate
@@ -251,31 +326,45 @@ def show_status():
         country_dir = Path(country)
         print(f"{country}:")
 
-        # Check plans
-        plans_file = country_dir / "plans.md"
-        if plans_file.exists() and plans_file.stat().st_size > 0:
-            print(f"  ✓ Has plans")
-        else:
-            print(f"  - No plans yet")
+        if not country_dir.exists():
+            print(f"  ! Directory not found - run initialize_game.py")
+            continue
 
-        # Check notes
-        notes_file = country_dir / "notes.md"
-        if notes_file.exists() and notes_file.stat().st_size > 0:
-            print(f"  ✓ Has notes")
+        # Check game_state
+        game_state_file = country_dir / config['paths']['game_state']
+        if game_state_file.exists() and game_state_file.stat().st_size > 100:
+            print(f"  ✓ Has game_state.md")
         else:
-            print(f"  - No notes yet")
+            print(f"  - game_state.md needs content")
+
+        # Check game_history
+        game_history_file = country_dir / config['paths']['game_history']
+        if game_history_file.exists() and game_history_file.stat().st_size > 100:
+            print(f"  ✓ Has game_history.md")
+        else:
+            print(f"  - game_history.md needs content")
+
+        # List other files
+        other_files = [f.name for f in country_dir.glob("*.md")
+                      if f.name not in {config['paths']['game_state'], config['paths']['game_history']}]
+        if other_files:
+            print(f"  ✓ Agent files: {', '.join(other_files)}")
 
         print()
 
 
 def main():
     if len(sys.argv) < 2:
+        print("Fog of War Diplomacy CLI")
+        print()
         print("Usage:")
-        print("  python diplomacy.py <country>    # Run a turn for a country")
-        print("  python diplomacy.py readiness    # Check if countries are ready for orders")
-        print("  python diplomacy.py overseer     # Analyze conversations for loose ends")
-        print("  python diplomacy.py orders       # Collect orders from all countries")
-        print("  python diplomacy.py status       # Show game status")
+        print("  python diplomacy.py <country>         # Run a turn for a country")
+        print("  python diplomacy.py reflect <country> # Strategic reflection session")
+        print("  python diplomacy.py readiness         # Check if countries are ready for orders")
+        print("  python diplomacy.py overseer          # Analyze conversations for loose ends")
+        print("  python diplomacy.py orders            # Collect orders from all countries")
+        print("  python diplomacy.py status            # Show game status")
+        print("  python diplomacy.py cleanup           # Remove all game files (reset)")
         print(f"\nCountries: {', '.join(get_all_countries())}")
         sys.exit(1)
 
@@ -290,6 +379,26 @@ def main():
         collect_orders()
     elif command == "status":
         show_status()
+    elif command == "cleanup":
+        cleanup()
+    elif command == "reflect":
+        if len(sys.argv) < 3:
+            print("Usage: python diplomacy.py reflect <country>")
+            print(f"Countries: {', '.join(get_all_countries())}")
+            sys.exit(1)
+        country_name = sys.argv[2]
+        # Find country (case-insensitive)
+        countries = get_all_countries()
+        country = None
+        for c in countries:
+            if c.lower() == country_name.lower():
+                country = c
+                break
+        if country is None:
+            print(f"Error: '{country_name}' is not a recognized country")
+            print(f"Countries: {', '.join(countries)}")
+            sys.exit(1)
+        run_reflect(country)
     else:
         # Assume it's a country name
         countries = get_all_countries()
