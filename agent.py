@@ -80,8 +80,8 @@ A year has passed. This is your opportunity to step back and think about the big
 - Clean up and reorganize your notes and files
 
 **FILE MANAGEMENT:**
-Use this time to consolidate your thinking. You can:
-- Append new insights to existing files
+Use this time to consolidate your thinking. You can create new files or manage existing ones:
+- Append new insights (or create a new file)
 - Edit files to restructure or condense them
 - Delete files that are no longer relevant
 

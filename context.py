@@ -109,11 +109,11 @@ class ContextLoader:
 - You can READ all conversation history
 
 **FILE MANAGEMENT:**
-You can organize your thoughts in any files you want using:
+You can create and manage your own files to organize your thoughts however you like.
 <FILE name="filename.md" mode="append|edit|delete">content</FILE>
 
-- mode="append" (default): Add to end of file
-- mode="edit": Replace entire file
+- mode="append" (default): Add to end of file, or create new file
+- mode="edit": Replace entire file contents
 - mode="delete": Remove file
 
 Recommended: Use append during the season, edit/delete to reorganize between seasons.
