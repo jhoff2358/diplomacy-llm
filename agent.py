@@ -70,13 +70,24 @@ What would you like to do this turn?"""
 
         initial_prompt = f"""You are playing as {self.country}. This is a STRATEGIC REFLECTION session.
 
-Take time to:
-1. Analyze your current position and trajectory
-2. Evaluate your alliances and diplomatic relationships
-3. Plan your next 2-3 seasons
-4. Reorganize your files if needed (use mode="edit" or mode="delete")
+A year has passed. This is your opportunity to step back and think about the big picture before the next year begins.
 
-This is a time for thinking and planning, not diplomacy.
+**PURPOSE:**
+- Review what happened this past year
+- Analyze your current position and trajectory
+- Evaluate which alliances are serving you and which are not
+- Plan your approach for the coming year
+- Clean up and reorganize your notes and files
+
+**FILE MANAGEMENT:**
+Use this time to consolidate your thinking. You can:
+- Append new insights to existing files
+- Edit files to restructure or condense them
+- Delete files that are no longer relevant
+
+<FILE name="filename.md" mode="append|edit|delete">content</FILE>
+
+**NO MESSAGING:** This is private reflection time. Messages cannot be sent during this session.
 
 ---
 
@@ -84,7 +95,7 @@ This is a time for thinking and planning, not diplomacy.
 
 ---
 
-Reflect on your strategy:"""
+Reflect on the past year and prepare for the next:"""
 
         return initial_prompt
 
@@ -156,8 +167,9 @@ Reflect on your strategy:"""
         response = self.chat.send_message(prompt)
         response_text = response.text
 
-        # Parse actions (only file operations expected, but parse all)
+        # Parse actions but filter out messages (reflection is private)
         actions = self.parse_response(response_text)
+        actions['messages'] = []  # No messaging during reflection
 
         return response_text, actions
 
