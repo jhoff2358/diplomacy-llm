@@ -25,13 +25,9 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Game state (user manages these manually)
-conversations/
-*/plans.md
-*/notes.md
+# Game data (generated at runtime)
+countries/
 orders.md
-turn_order.txt
 
 # Claude Code
 .claude/
-game_history.md

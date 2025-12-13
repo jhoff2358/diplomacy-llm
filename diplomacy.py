@@ -241,9 +241,10 @@ def cleanup():
     print_section_header("CLEANUP - RESETTING GAME FILES")
     config = load_config()
     countries = get_all_countries(config)
+    data_dir = Path(config['paths']['data_dir'])
 
     # Clear conversations
-    conv_dir = Path("conversations")
+    conv_dir = data_dir / config['paths']['shared_conversations_dir']
     if conv_dir.exists():
         count = 0
         for conv_file in conv_dir.glob("*.md"):
@@ -255,7 +256,7 @@ def cleanup():
 
     # Clear country folders
     for country in countries:
-        country_dir = Path(country)
+        country_dir = data_dir / country
         if country_dir.exists():
             count = 0
             for md_file in country_dir.glob("*.md"):
@@ -264,6 +265,14 @@ def cleanup():
             print(f"✓ Removed {count} files from {country}/")
         else:
             print(f"- No {country}/ directory")
+
+    # Clear shared files in classic mode
+    if not is_fow(config):
+        for shared_file in ['game_state.md', 'game_history.md']:
+            shared_path = data_dir / shared_file
+            if shared_path.exists():
+                shared_path.unlink()
+                print(f"✓ Removed shared {shared_file}")
 
     print("\n✓ Cleanup complete!")
     print("\nRun 'python initialize_game.py' to set up a fresh game.")
@@ -274,6 +283,7 @@ def show_status():
     config = load_config()
     fow_enabled = is_fow(config)
     countries = get_all_countries(config)
+    data_dir = Path(config['paths']['data_dir'])
     mode_name = "Fog of War" if fow_enabled else "Classic"
 
     print_section_header(f"DIPLOMACY LLM - GAME STATUS ({mode_name} Mode)")
@@ -285,7 +295,7 @@ def show_status():
 
     # In classic mode, check for shared game_state.md
     if not fow_enabled:
-        shared_state = Path(config['paths']['data_dir']) / 'game_state.md'
+        shared_state = data_dir / 'game_state.md'
         if shared_state.exists() and shared_state.stat().st_size > 50:
             print("Shared game_state.md: ✓ exists")
         else:
@@ -293,7 +303,7 @@ def show_status():
         print()
 
     # Check conversations directory
-    conv_dir = Path("conversations")
+    conv_dir = data_dir / config['paths']['shared_conversations_dir']
     if conv_dir.exists():
         conv_files = list(conv_dir.glob("*.md"))
         print(f"Active Conversations: {len(conv_files)}")
@@ -307,7 +317,7 @@ def show_status():
     print()
 
     for country in countries:
-        country_dir = Path(country)
+        country_dir = data_dir / country
         print(f"{country}:")
 
         if not country_dir.exists():
