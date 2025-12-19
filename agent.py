@@ -209,12 +209,12 @@ Reflect on the past year and prepare for the next:"""
         self.sync_shared_files()  # Copy shared files in classic mode
         prompt = self.initialize_session()
 
-        # Get response from LLM with retry
-        response = self._retry(
-            lambda: self.chat.send_message(prompt),
-            f"{self.country} turn"
-        )
-        response_text = response.text
+        # Get response from LLM with retry (includes .text access which can also fail)
+        def get_response():
+            response = self.chat.send_message(prompt)
+            return response.text
+
+        response_text = self._retry(get_response, f"{self.country} turn")
 
         # Parse actions
         actions = self.parse_response(response_text)
@@ -226,12 +226,12 @@ Reflect on the past year and prepare for the next:"""
         self.sync_shared_files()  # Copy shared files in classic mode
         prompt = self.initialize_reflect_session()
 
-        # Get response from LLM with retry
-        response = self._retry(
-            lambda: self.chat.send_message(prompt),
-            f"{self.country} reflect"
-        )
-        response_text = response.text
+        # Get response from LLM with retry (includes .text access which can also fail)
+        def get_response():
+            response = self.chat.send_message(prompt)
+            return response.text
+
+        response_text = self._retry(get_response, f"{self.country} reflect")
 
         # Parse actions but filter out messages (reflection is private)
         actions = self.parse_response(response_text)
@@ -297,63 +297,17 @@ Reflect on the past year and prepare for the next:"""
         else:
             print(f"  ✗ Unknown mode '{mode}' - use append, edit, or delete")
 
-    def check_readiness(self, model_override: str = None) -> str:
-        """Ask the agent if they're ready to submit orders or need more discussion.
-
-        Args:
-            model_override: Optional model name to use instead of config default.
-                          Defaults to cheap_model from config to save costs.
-        """
-        self.sync_shared_files()  # Copy shared files in classic mode
-        context = self.context_loader.format_context()
-
-        # Use override model if provided, otherwise use cheap model from config
-        if model_override:
-            model = genai.GenerativeModel(model_override)
-        else:
-            model = genai.GenerativeModel(self.config['cheap_model'])
-
-        # Create a fresh chat for readiness check
-        chat = model.start_chat(history=[])
-
-        prompt = f"""{context}
-
----
-
-**READINESS CHECK**
-
-Before we collect orders, I need to check if you're ready. Consider:
-
-1. Are there any unanswered questions in your conversations that could affect your strategy?
-2. Are there pending negotiations or proposals you're waiting on?
-3. Do you have enough information to confidently submit orders?
-
-It's perfectly fine to request more discussion time. Don't just say READY to be agreeable - if there's genuine uncertainty or an important conversation that hasn't concluded, say so.
-
-Respond with:
-- **READY** - if you have enough clarity to submit orders
-- **NEED MORE DISCUSSION** - if there are unresolved questions or pending negotiations
-
-Then briefly explain why (1-2 sentences).
-
-Do not use XML tags. Just answer directly."""
-
-        response = self._retry(
-            lambda: chat.send_message(prompt),
-            f"{self.country} readiness check"
-        )
-        return response.text.strip()
-
     def get_orders(self) -> str:
         """Ask the agent for their orders for this phase.
-        Uses cheap model from config to save costs.
+
+        Returns orders or "PASS" if more diplomacy time is needed.
+        Uses the main model for better judgment.
         """
         self.sync_shared_files()  # Copy shared files in classic mode
         context = self.context_loader.format_context()
 
-        # Create a fresh chat for orders using cheap model
-        cheap_model = genai.GenerativeModel(self.config['cheap_model'])
-        chat = cheap_model.start_chat(history=[])
+        # Use main model for orders (better judgment on pass vs submit)
+        chat = self.model.start_chat(history=[])
 
         prompt = f"""{context}
 
@@ -361,19 +315,53 @@ Do not use XML tags. Just answer directly."""
 
 **ORDERS PHASE**
 
-It is time to submit your orders for this phase. Output ONLY your orders, one per line, using standard Diplomacy notation.
+It is time to submit your orders for this phase. Before deciding, consider:
 
-Examples:
+1. Are there any unanswered questions in your conversations that could affect your strategy?
+2. Are there pending negotiations or proposals you're waiting on?
+3. Do you have enough information to confidently submit orders?
+
+You have two options:
+
+**Submit orders** - Output your orders, one per line, using standard Diplomacy notation:
 - A Par - Bur (Army Paris moves to Burgundy)
 - F Lon - NTH (Fleet London moves to North Sea)
 - A Mun S A Par - Bur (Army Munich supports Army Paris to Burgundy)
 - F NTH C A Lon - Bel (Fleet North Sea convoys Army London to Belgium)
 - A Vie H (Army Vienna holds)
 
-Do NOT include any messages, file operations, or other commentary. Output only your orders."""
+**PASS** - If you need more diplomacy time. You will get another round to message before orders are collected again.
 
-        response = self._retry(
-            lambda: chat.send_message(prompt),
-            f"{self.country} orders"
-        )
-        return response.text
+Do NOT include any messages or file operations. Output only your orders OR "PASS"."""
+
+        def get_response():
+            response = chat.send_message(prompt)
+            return response.text
+
+        return self._retry(get_response, f"{self.country} orders")
+
+    def query(self, question: str) -> str:
+        """Ask the agent a direct question (meta-communication from GM).
+
+        No messages or file operations - just a direct response.
+        """
+        self.sync_shared_files()  # Copy shared files in classic mode
+        context = self.context_loader.format_context()
+
+        chat = self.model.start_chat(history=[])
+
+        prompt = f"""{context}
+
+---
+
+**GM QUERY**
+
+The Game Master has a question for you. This is meta-communication - do not send any messages or update any files. Just respond directly.
+
+Question: {question}"""
+
+        def get_response():
+            response = chat.send_message(prompt)
+            return response.text
+
+        return self._retry(get_response, f"{self.country} query")

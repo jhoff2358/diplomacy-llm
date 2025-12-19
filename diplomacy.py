@@ -12,6 +12,7 @@ Usage:
     python diplomacy.py overseer          # Check for loose ends in all conversations
     python diplomacy.py orders            # Collect orders from all countries
     python diplomacy.py status            # Show current game status
+    python diplomacy.py query <country> <question>  # Ask a country a direct question
 """
 
 import sys
@@ -67,6 +68,30 @@ def run_country_turn(country: str):
         traceback.print_exc()
 
 
+def run_query(country: str, question: str):
+    """Ask a country a direct question from the GM."""
+    try:
+        agent = DiplomacyAgent(country)
+        config = load_config()
+        season = get_current_season(config)
+
+        print(f"\nCurrent Season: {season}")
+        print_section_header(f"GM Query to {country}")
+        print(f"Question: {question}\n")
+
+        response = agent.query(question)
+
+        print(f"{country} responds:")
+        print("-" * 60)
+        print(response)
+        print("-" * 60)
+
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+
+
 def run_reflect(country: str):
     """Run a strategic reflection session for a country."""
     try:
@@ -102,41 +127,6 @@ def run_reflect(country: str):
         traceback.print_exc()
 
 
-def check_readiness():
-    """Check if all countries are ready to submit orders."""
-    print_section_header("READINESS CHECK")
-    config = load_config()
-    season = get_current_season(config)
-    countries = get_all_countries(config)
-    cheap_model = config.get('cheap_model', 'gemini-flash-latest')
-    print(f"Season: {season}")
-    print(f"Checking if countries are ready to submit orders...")
-    print(f"Using model: {cheap_model} (cheap model for readiness checks)\n")
-
-    ready_count = 0
-    need_discussion = 0
-
-    for country in countries:
-        print_section_header(country)
-        try:
-            agent = DiplomacyAgent(country)
-            response = agent.check_readiness()
-            print(response)
-
-            # Simple heuristic to count readiness
-            if "READY" in response.upper() and "NEED MORE" not in response.upper():
-                ready_count += 1
-            else:
-                need_discussion += 1
-
-        except Exception as e:
-            print(f"✗ Error checking {country}: {e}")
-
-    print_section_header("SUMMARY")
-    print(f"Ready: {ready_count}/{len(countries)}")
-    print(f"Need more discussion: {need_discussion}/{len(countries)}")
-
-
 def overseer():
     """Analyze all conversations for loose ends and unresolved discussions."""
     print_section_header("OVERSEER ANALYSIS")
@@ -159,9 +149,10 @@ def overseer():
     model = genai.GenerativeModel(cheap_model_name)
 
     # Get all conversation files
-    conv_dir = Path("conversations")
+    data_dir = Path(config['paths']['data_dir'])
+    conv_dir = data_dir / config['paths']['shared_conversations_dir']
     if not conv_dir.exists():
-        print("No conversations directory found.")
+        print(f"No conversations directory found at {conv_dir}")
         return
 
     conv_files = list(conv_dir.glob("*.md"))
@@ -206,103 +197,137 @@ Be concise and focus on actionable insights."""
     print()
 
 
-def collect_orders():
-    """Collect orders from all countries."""
-    print_section_header("COLLECTING ORDERS FROM ALL COUNTRIES")
+def collect_orders(turn_order: list = None) -> bool:
+    """Collect orders from all countries.
+
+    Args:
+        turn_order: Optional list of countries in order. If None, uses config order.
+
+    Returns:
+        True if all countries submitted orders, False if any passed.
+    """
+    print_section_header("COLLECTING ORDERS")
     config = load_config()
-    season = f"{get_current_season(config)} - Orders"
-    countries = get_all_countries(config)
+    season = get_current_season(config)
+    countries = turn_order or get_all_countries(config)
 
     print(f"Season: {season}\n")
 
     orders_file = Path("orders.md")
-    with open(orders_file, 'w') as f:
-        f.write(f"# Orders for {season}\n\n")
+    passed_countries = []
+    all_orders = {}
 
-        for country in countries:
-            print(f"\nGetting orders from {country}...")
-            try:
-                agent = DiplomacyAgent(country)
-                orders = agent.get_orders()
+    for country in countries:
+        print(f"\nGetting orders from {country}...")
+        try:
+            agent = DiplomacyAgent(country)
+            orders = agent.get_orders()
 
-                f.write(f"## {country}\n\n")
-                f.write(orders)
-                f.write("\n\n---\n\n")
-
+            # Check if they passed
+            if "PASS" in orders.upper().split('\n')[0]:
+                passed_countries.append(country)
+                print(f"  {country} PASSED - needs more diplomacy time")
+                print(f"  Reason: {orders.strip()}")
+            else:
+                all_orders[country] = orders
                 print(f"✓ {country}'s orders received")
 
-            except Exception as e:
-                print(f"✗ Error getting orders from {country}: {e}")
-                f.write(f"## {country}\n\nERROR: {e}\n\n---\n\n")
+        except Exception as e:
+            print(f"✗ Error getting orders from {country}: {e}")
+            passed_countries.append(country)
 
-    print(f"\n✓ All orders saved to {orders_file}")
+    # Only write orders file if everyone submitted
+    if not passed_countries:
+        with open(orders_file, 'w') as f:
+            f.write(f"# Orders for {season}\n\n")
+            for country in countries:
+                f.write(f"## {country}\n\n")
+                f.write(all_orders[country])
+                f.write("\n\n---\n\n")
+        print(f"\n✓ All orders saved to {orders_file}")
+        return True
+    else:
+        print(f"\n! {len(passed_countries)} country/countries passed: {', '.join(passed_countries)}")
+        print("Orders NOT saved. Run another round of turns.")
+        return False
+
+
+def load_turn_order() -> list:
+    """Load turn order from turn_order.txt."""
+    turn_order_file = Path("turn_order.txt")
+    if not turn_order_file.exists():
+        return []
+    lines = turn_order_file.read_text().strip().split('\n')
+    return [line.strip() for line in lines if line.strip()]
+
+
+def save_turn_order(turn_order: list):
+    """Save turn order to turn_order.txt."""
+    turn_order_file = Path("turn_order.txt")
+    turn_order_file.write_text('\n'.join(turn_order) + '\n')
+
+
+def randomize_order():
+    """Randomize and save turn order to turn_order.txt."""
+    config = load_config()
+    countries = get_all_countries(config)
+    turn_order = countries.copy()
+    random.shuffle(turn_order)
+    save_turn_order(turn_order)
+    print(f"Turn order saved to turn_order.txt:")
+    for country in turn_order:
+        print(f"  {country}")
+
+
+def run_all_turns():
+    """Run turns for all countries in order from turn_order.txt."""
+    turn_order = load_turn_order()
+    if not turn_order:
+        print("Error: turn_order.txt not found or empty. Run 'randomize' first.")
+        return
+
+    print(f"Running turns for: {', '.join(turn_order)}\n")
+    for country in turn_order:
+        run_country_turn(country)
+        print()
 
 
 def run_season():
-    """Run a full season: turns, readiness check, and orders collection."""
+    """Run a full season: turns, orders collection (with pass loop)."""
     config = load_config()
     season = get_current_season(config)
     countries = get_all_countries(config)
     turn_rounds = config.get('season', {}).get('turn_rounds', 2)
 
+    # Randomize country order once for the entire season
+    turn_order = countries.copy()
+    random.shuffle(turn_order)
+    save_turn_order(turn_order)
+
     print_section_header(f"RUNNING SEASON: {season}")
-    print(f"Countries: {', '.join(countries)}")
-    print(f"Turn rounds before readiness check: {turn_rounds}\n")
+    print(f"Turn order: {', '.join(turn_order)}")
+    print(f"Turn rounds before orders: {turn_rounds}\n")
 
     # Run initial turn rounds
     for round_num in range(1, turn_rounds + 1):
         print_section_header(f"TURN ROUND {round_num}/{turn_rounds}")
 
-        # Randomize country order
-        shuffled = countries.copy()
-        random.shuffle(shuffled)
-        print(f"Order: {', '.join(shuffled)}\n")
-
-        for country in shuffled:
+        for country in turn_order:
             run_country_turn(country)
             print()
 
-    # Check readiness loop
+    # Orders loop - keep running turns until everyone submits
     while True:
-        print_section_header("READINESS CHECK")
-        ready_countries = []
-        not_ready_countries = []
+        all_submitted = collect_orders(turn_order)
 
-        for country in countries:
-            try:
-                agent = DiplomacyAgent(country)
-                response = agent.check_readiness()
-                print(f"{country}: {response[:100]}...")
-
-                if "READY" in response.upper() and "NEED MORE" not in response.upper():
-                    ready_countries.append(country)
-                else:
-                    not_ready_countries.append(country)
-
-            except Exception as e:
-                print(f"✗ Error checking {country}: {e}")
-                not_ready_countries.append(country)
-
-        print(f"\nReady: {len(ready_countries)}/{len(countries)}")
-
-        if len(ready_countries) == len(countries):
-            print("All countries ready! Collecting orders...")
+        if all_submitted:
             break
         else:
-            print(f"Not ready: {', '.join(not_ready_countries)}")
             print("\nRunning another round of turns...")
-
-            # Run another round with randomized order
-            shuffled = countries.copy()
-            random.shuffle(shuffled)
-            print(f"Order: {', '.join(shuffled)}\n")
-
-            for country in shuffled:
+            for country in turn_order:
                 run_country_turn(country)
                 print()
 
-    # Collect orders
-    collect_orders()
     print_section_header("SEASON COMPLETE")
     print(f"Season {season} finished. Orders saved to orders.md")
 
@@ -429,26 +454,30 @@ def main():
         print("Usage:")
         print("  python diplomacy.py <country>         # Run a turn for a country")
         print("  python diplomacy.py reflect <country> # Strategic reflection session")
-        print("  python diplomacy.py season            # Run full season (turns + readiness + orders)")
-        print("  python diplomacy.py readiness         # Check if countries are ready for orders")
+        print("  python diplomacy.py randomize         # Randomize and save turn order")
+        print("  python diplomacy.py all               # Run turns for all countries (from turn_order.txt)")
+        print("  python diplomacy.py season            # Run full season (turns + orders loop)")
+        print("  python diplomacy.py orders            # Collect orders (countries can PASS)")
         print("  python diplomacy.py overseer          # Analyze conversations for loose ends")
-        print("  python diplomacy.py orders            # Collect orders from all countries")
         print("  python diplomacy.py status            # Show game status")
         print("  python diplomacy.py cleanup           # Remove all game files (reset)")
+        print("  python diplomacy.py query <country> <question>  # Ask a country a direct question")
         print(f"\nCountries: {', '.join(countries)}")
         sys.exit(1)
 
     command = sys.argv[1].lower()
 
     # Special commands
-    if command == "season":
+    if command == "randomize":
+        randomize_order()
+    elif command == "all":
+        run_all_turns()
+    elif command == "season":
         run_season()
-    elif command == "readiness":
-        check_readiness()
-    elif command == "overseer":
-        overseer()
     elif command == "orders":
         collect_orders()
+    elif command == "overseer":
+        overseer()
     elif command == "status":
         show_status()
     elif command == "cleanup":
@@ -464,6 +493,19 @@ def main():
             print(f"Countries: {', '.join(countries)}")
             sys.exit(1)
         run_reflect(country)
+    elif command == "query":
+        if len(sys.argv) < 4:
+            print("Usage: python diplomacy.py query <country> <question>")
+            print(f"Countries: {', '.join(countries)}")
+            sys.exit(1)
+        country = find_country(sys.argv[2], countries)
+        if country is None:
+            print(f"Error: '{sys.argv[2]}' is not a recognized country")
+            print(f"Countries: {', '.join(countries)}")
+            sys.exit(1)
+        # Join remaining args as the question
+        question = ' '.join(sys.argv[3:])
+        run_query(country, question)
     else:
         # Assume it's a country name
         country = find_country(command, countries)
