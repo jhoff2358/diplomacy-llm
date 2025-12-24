@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict, List
 import yaml
 
-from utils import is_fow, is_gunboat, get_data_dir, get_country_dir, get_conversations_dir
+from .utils import is_fow, is_gunboat, get_data_dir, get_country_dir, get_conversations_dir
 
 
 class ContextLoader:

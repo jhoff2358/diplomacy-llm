@@ -16,16 +16,16 @@ from pathlib import Path
 import google.generativeai as genai
 from dotenv import load_dotenv
 
-from agent import DiplomacyAgent
-from game_manager import cleanup, initialize_game, show_status
-from orchestrator import (
+from src.agent import DiplomacyAgent
+from src.game_manager import cleanup, initialize_game, show_status
+from src.orchestrator import (
     collect_orders,
     randomize_order,
     run_all_turns,
     run_country_turn,
     run_season,
 )
-from utils import (
+from src.utils import (
     load_config,
     is_gunboat,
     get_all_countries,
@@ -174,6 +174,52 @@ Be concise and focus on actionable insights."""
 
 
 # =============================================================================
+# Setup
+# =============================================================================
+
+def setup():
+    """Install dependencies and configure environment."""
+    import subprocess
+    import shutil
+
+    print("Diplomacy LLM Setup")
+    print("===================\n")
+
+    # Install dependencies
+    print("Installing dependencies...")
+    result = subprocess.run(
+        [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
+        capture_output=False
+    )
+
+    if result.returncode != 0:
+        print("\n✗ Failed to install dependencies")
+        return
+
+    print("\n✓ Dependencies installed")
+
+    # Check/create .env
+    env_path = Path(".env")
+    if not env_path.exists():
+        example_path = Path(".env.example")
+        if example_path.exists():
+            shutil.copy(example_path, env_path)
+            print("✓ Created .env from template")
+            print("  → Please add your GEMINI_API_KEY to .env")
+        else:
+            env_path.write_text("GEMINI_API_KEY=your_api_key_here\n")
+            print("✓ Created .env file")
+            print("  → Please add your GEMINI_API_KEY to .env")
+    else:
+        print("✓ .env file exists")
+
+    print("\nSetup complete! Next steps:")
+    print("  1. Add your GEMINI_API_KEY to .env (if not already done)")
+    print("  2. Run: python diplomacy.py init")
+    print("  3. Run: python diplomacy.py status")
+
+
+# =============================================================================
 # Help
 # =============================================================================
 
@@ -200,6 +246,7 @@ def show_help(config: dict):
     print("  init                Initialize game (runs cleanup first)")
     print("  init --no-cleanup   Initialize without running cleanup")
     print("  cleanup             Remove all game files (reset)")
+    print("  setup               Install dependencies and configure environment")
     print("  help, -h, --help    Show this help message")
     print()
     print(f"Countries: {', '.join(countries)}")
@@ -223,6 +270,7 @@ COMMANDS = {
     'overseer': overseer,
     'status': show_status,
     'cleanup': cleanup,
+    'setup': setup,
 }
 
 

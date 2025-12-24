@@ -13,8 +13,8 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import yaml
 
-from context import ContextLoader
-from utils import is_fow, is_gunboat, get_country_dir
+from .context import ContextLoader
+from .utils import is_fow, is_gunboat, get_country_dir
 
 T = TypeVar('T')
 

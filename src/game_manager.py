@@ -5,7 +5,7 @@ Handles initialization, cleanup, status display, and templates.
 
 from pathlib import Path
 
-from utils import (
+from .utils import (
     load_config,
     is_fow,
     is_gunboat,

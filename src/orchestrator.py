@@ -6,8 +6,8 @@ Handles season execution, turn order management, and order collection.
 import random
 from pathlib import Path
 
-from agent import DiplomacyAgent
-from utils import (
+from .agent import DiplomacyAgent
+from .utils import (
     load_config,
     is_gunboat,
     get_all_countries,
