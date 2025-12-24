@@ -36,16 +36,30 @@ class ContextLoader:
         """Check if fog of war mode is enabled."""
         return self.config.get('features', {}).get('fog_of_war', False)
 
+    def is_gunboat(self) -> bool:
+        """Check if gunboat mode is enabled (no diplomacy)."""
+        return self.config.get('features', {}).get('gunboat', False)
+
     def load_game_history(self) -> str:
-        """Load the country's game history."""
-        if self.game_history_file.exists():
-            return self.game_history_file.read_text()
+        """Load game history. FoW uses per-country files; classic/gunboat use shared."""
+        if self.is_fow():
+            path = self.game_history_file  # Per-country file
+        else:
+            path = self.data_dir / self.config['paths']['game_history']  # Shared file
+
+        if path.exists():
+            return path.read_text()
         return "# Game History\n\nNo game history yet. The game is just beginning!"
 
     def load_game_state(self) -> str:
-        """Load the country's current visible game state."""
-        if self.game_state_file.exists():
-            return self.game_state_file.read_text()
+        """Load game state. FoW uses per-country files; classic/gunboat use shared."""
+        if self.is_fow():
+            path = self.game_state_file  # Per-country file
+        else:
+            path = self.data_dir / self.config['paths']['game_state']  # Shared file
+
+        if path.exists():
+            return path.read_text()
         return "# Game State\n\nNo game state yet."
 
     def load_country_files(self) -> Dict[str, str]:
@@ -71,6 +85,10 @@ class ContextLoader:
     def load_conversations(self) -> Dict[str, str]:
         """Load all conversation files where this country is a participant."""
         conversations = {}
+
+        # No conversations in gunboat mode
+        if self.is_gunboat():
+            return conversations
 
         if not self.conversations_dir.exists():
             return conversations
@@ -107,7 +125,15 @@ class ContextLoader:
         conversations = self.load_conversations()
 
         # Build intro and rules based on mode
-        if self.is_fow():
+        if self.is_gunboat():
+            intro = f"You are playing as {self.country} in a game of GUNBOAT Diplomacy."
+            rules_section = """
+**GUNBOAT RULES:**
+- No communication with other countries is allowed
+- You can only analyze the board and submit orders
+- Use your files to track your strategic thinking
+"""
+        elif self.is_fow():
             intro = f"You are playing as {self.country} in a game of Fog of War Diplomacy."
             rules_section = """
 **FOG OF WAR RULES:**
@@ -134,11 +160,17 @@ You can create and manage your own files to organize your thoughts however you l
 - mode="edit": Replace entire file contents
 - mode="delete": Remove file
 
-Recommended: Use append during the season, edit/delete to reorganize between seasons.
+Recommended: Use append during the season, edit/delete during reflect phase to reorganize.
+"""
 
+        # Only show messaging instructions if not gunboat
+        if not self.is_gunboat():
+            context += """
 **MESSAGING:**
 <MESSAGE to="Country">Your message</MESSAGE>
+"""
 
+        context += f"""
 ---
 
 # YOUR CURRENT STATE
@@ -160,13 +192,15 @@ Recommended: Use append during the season, edit/delete to reorganize between sea
         else:
             context += "\nNo files yet. Create some to organize your thoughts!\n"
 
-        context += "\n---\n\n# CONVERSATION HISTORY\n"
+        # Only show conversation section if not gunboat
+        if not self.is_gunboat():
+            context += "\n---\n\n# CONVERSATION HISTORY\n"
 
-        if conversations:
-            for participants, conv_text in sorted(conversations.items()):
-                context += f"\n## Conversation with {participants}\n{conv_text}\n"
-        else:
-            context += "\nNo conversations yet. You may want to reach out to other countries!\n"
+            if conversations:
+                for participants, conv_text in sorted(conversations.items()):
+                    context += f"\n## Conversation with {participants}\n{conv_text}\n"
+            else:
+                context += "\nNo conversations yet. You may want to reach out to other countries!\n"
 
         return context
 
@@ -177,7 +211,8 @@ Recommended: Use append during the season, edit/delete to reorganize between sea
         return '-'.join(all_participants) + '.md'
 
     def get_conversation_file(self, participants: List[str]) -> Path:
-        """Get the path to a conversation file."""
-        self.conversations_dir.mkdir(parents=True, exist_ok=True)
+        """Get the path to a conversation file. Not used in gunboat mode."""
+        if not self.is_gunboat():
+            self.conversations_dir.mkdir(parents=True, exist_ok=True)
         filename = self.get_conversation_filename(participants)
         return self.conversations_dir / filename

@@ -7,7 +7,7 @@ which get copied to country folders on each turn.
 """
 
 from pathlib import Path
-from utils import load_config, is_fow, get_all_countries
+from utils import load_config, is_fow, is_gunboat, get_all_countries
 
 
 def create_game_history_template(country: str) -> str:
@@ -70,17 +70,25 @@ def create_shared_game_state_template() -> str:
 def main():
     config = load_config()
     fow_enabled = is_fow(config)
+    gunboat_enabled = is_gunboat(config)
     countries = get_all_countries(config)
-    mode_name = "Fog of War" if fow_enabled else "Classic"
+
+    if gunboat_enabled:
+        mode_name = "Gunboat"
+    elif fow_enabled:
+        mode_name = "Fog of War"
+    else:
+        mode_name = "Classic"
 
     print(f"Initializing {mode_name} Diplomacy game...\n")
 
     data_dir = Path(config['paths']['data_dir'])
-    conversations_dir = data_dir / config['paths']['shared_conversations_dir']
 
-    # Create conversations directory
-    conversations_dir.mkdir(parents=True, exist_ok=True)
-    print(f"✓ Created {conversations_dir}/")
+    # Create conversations directory (not needed for gunboat)
+    if not gunboat_enabled:
+        conversations_dir = data_dir / config['paths']['shared_conversations_dir']
+        conversations_dir.mkdir(parents=True, exist_ok=True)
+        print(f"✓ Created {conversations_dir}/")
 
     # Create per-country directories
     for country in countries:
@@ -98,23 +106,31 @@ def main():
             print(f"✓ Created {country}/")
 
     if not fow_enabled:
-        # Classic mode: create single shared game_state.md and game_history.md in root
+        # Classic/Gunboat mode: copy beginning_info.md to game_state.md, create game_history.md
+        beginning_info = Path('beginning_info.md')
         shared_game_state = data_dir / 'game_state.md'
-        shared_game_state.write_text(create_shared_game_state_template())
+        if beginning_info.exists():
+            shared_game_state.write_text(beginning_info.read_text())
+            print(f"✓ Copied beginning_info.md to game_state.md")
+        else:
+            shared_game_state.write_text(create_shared_game_state_template())
+            print(f"✓ Created game_state.md (beginning_info.md not found)")
         shared_game_history = data_dir / 'game_history.md'
         shared_game_history.write_text(create_shared_game_history_template())
-        print(f"✓ Created shared game_state.md and game_history.md")
+        print(f"✓ Created game_history.md")
 
     print("\n✓ Game initialized!")
     print(f"\nMode: {mode_name}")
     print("\nNext steps:")
     if fow_enabled:
         print("  1. Fill in each country's game_state.md with their starting visibility")
+        print("  2. Make sure your .env file has your Gemini API key")
+        print("  3. Run: python diplomacy.py status")
+        print("  4. Start the game: python diplomacy.py run_season")
     else:
-        print("  1. Fill in the shared game_state.md and game_history.md")
-    print("  2. Make sure your .env file has your Gemini API key")
-    print("  3. Run: python diplomacy.py status")
-    print("  4. Start the game: python diplomacy.py austria")
+        print("  1. Make sure your .env file has your Gemini API key")
+        print("  2. Run: python diplomacy.py status")
+        print("  3. Start the game: python diplomacy.py run_season")
 
 
 if __name__ == "__main__":

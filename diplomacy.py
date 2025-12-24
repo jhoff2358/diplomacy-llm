@@ -26,6 +26,7 @@ import os
 from utils import (
     load_config,
     is_fow,
+    is_gunboat,
     get_current_season,
     get_all_countries,
     find_country,
@@ -131,6 +132,11 @@ def overseer():
     """Analyze all conversations for loose ends and unresolved discussions."""
     print_section_header("OVERSEER ANALYSIS")
     config = load_config()
+
+    if is_gunboat(config):
+        print("Overseer is not available in gunboat mode (no conversations).")
+        return
+
     season = get_current_season(config)
     cheap_model_name = config.get('cheap_model', 'gemini-flash-latest')
 
@@ -205,13 +211,19 @@ def collect_orders(turn_order: list = None) -> bool:
 
     Returns:
         True if all countries submitted orders, False if any passed.
+        In gunboat mode, always returns True (no PASS option).
     """
     print_section_header("COLLECTING ORDERS")
     config = load_config()
     season = get_current_season(config)
     countries = turn_order or get_all_countries(config)
+    gunboat = is_gunboat(config)
 
-    print(f"Season: {season}\n")
+    print(f"Season: {season}")
+    if gunboat:
+        print("Mode: Gunboat (no PASS option)\n")
+    else:
+        print()
 
     orders_file = Path("orders.md")
     passed_countries = []
@@ -223,8 +235,8 @@ def collect_orders(turn_order: list = None) -> bool:
             agent = DiplomacyAgent(country)
             orders = agent.get_orders()
 
-            # Check if they passed
-            if "PASS" in orders.upper().split('\n')[0]:
+            # Check if they passed (only in non-gunboat mode)
+            if not gunboat and "PASS" in orders.upper().split('\n')[0]:
                 passed_countries.append(country)
                 print(f"  {country} PASSED - needs more diplomacy time")
                 print(f"  Reason: {orders.strip()}")
@@ -234,7 +246,8 @@ def collect_orders(turn_order: list = None) -> bool:
 
         except Exception as e:
             print(f"✗ Error getting orders from {country}: {e}")
-            passed_countries.append(country)
+            if not gunboat:
+                passed_countries.append(country)
 
     # Only write orders file if everyone submitted
     if not passed_countries:
@@ -242,7 +255,7 @@ def collect_orders(turn_order: list = None) -> bool:
             f.write(f"# Orders for {season}\n\n")
             for country in countries:
                 f.write(f"## {country}\n\n")
-                f.write(all_orders[country])
+                f.write(all_orders.get(country, "ERROR: No orders received"))
                 f.write("\n\n---\n\n")
         print(f"\n✓ All orders saved to {orders_file}")
         return True
@@ -293,43 +306,64 @@ def run_all_turns():
 
 
 def run_season():
-    """Run a full season: turns, orders collection (with pass loop)."""
+    """Run a full season: turns, orders collection (with pass loop).
+
+    In gunboat mode: 1 planning turn, then mandatory orders.
+    In classic mode: Multiple turn rounds, then orders with PASS loop.
+    """
     config = load_config()
     season = get_current_season(config)
     countries = get_all_countries(config)
-    turn_rounds = config.get('season', {}).get('turn_rounds', 2)
+    gunboat = is_gunboat(config)
 
-    # Randomize country order once for the entire season
-    turn_order = countries.copy()
-    random.shuffle(turn_order)
-    save_turn_order(turn_order)
+    if gunboat:
+        # Gunboat: Single turn per country - they include orders in orders.md
+        print_section_header(f"RUNNING SEASON: {season}")
+        print("Mode: Gunboat")
+        print(f"Countries: {', '.join(countries)}\n")
 
-    print_section_header(f"RUNNING SEASON: {season}")
-    print(f"Turn order: {', '.join(turn_order)}")
-    print(f"Turn rounds before orders: {turn_rounds}\n")
-
-    # Run initial turn rounds
-    for round_num in range(1, turn_rounds + 1):
-        print_section_header(f"TURN ROUND {round_num}/{turn_rounds}")
-
-        for country in turn_order:
+        for country in countries:
+            print(f"--- {country} ---")
             run_country_turn(country)
             print()
+    else:
+        # Classic: Randomize order, multiple rounds, PASS loop
+        turn_order = countries.copy()
+        random.shuffle(turn_order)
+        save_turn_order(turn_order)
 
-    # Orders loop - keep running turns until everyone submits
-    while True:
-        all_submitted = collect_orders(turn_order)
+        print_section_header(f"RUNNING SEASON: {season}")
+        print("Mode: Classic")
+        print(f"Turn order: {', '.join(turn_order)}")
 
-        if all_submitted:
-            break
-        else:
-            print("\nRunning another round of turns...")
+        turn_rounds = config.get('season', {}).get('turn_rounds', 2)
+        print(f"Turn rounds before orders: {turn_rounds}\n")
+
+        # Run initial turn rounds
+        for round_num in range(1, turn_rounds + 1):
+            print_section_header(f"TURN ROUND {round_num}/{turn_rounds}")
+
             for country in turn_order:
                 run_country_turn(country)
                 print()
 
+        # Orders loop - keep running turns until everyone submits
+        while True:
+            all_submitted = collect_orders(turn_order)
+
+            if all_submitted:
+                break
+            else:
+                print("\nRunning another round of turns...")
+                for country in turn_order:
+                    run_country_turn(country)
+                    print()
+
     print_section_header("SEASON COMPLETE")
-    print(f"Season {season} finished. Orders saved to orders.md")
+    if gunboat:
+        print(f"Season {season} finished. Orders in each country's orders.md")
+    else:
+        print(f"Season {season} finished. Orders saved to orders.md")
 
 
 def cleanup():
@@ -378,9 +412,16 @@ def show_status():
     """Show current game status."""
     config = load_config()
     fow_enabled = is_fow(config)
+    gunboat_enabled = is_gunboat(config)
     countries = get_all_countries(config)
     data_dir = Path(config['paths']['data_dir'])
-    mode_name = "Fog of War" if fow_enabled else "Classic"
+
+    if gunboat_enabled:
+        mode_name = "Gunboat"
+    elif fow_enabled:
+        mode_name = "Fog of War"
+    else:
+        mode_name = "Classic"
 
     print_section_header(f"DIPLOMACY LLM - GAME STATUS ({mode_name} Mode)")
 
@@ -389,28 +430,34 @@ def show_status():
         print(f"Notes: {config['game'].get('notes')}")
     print()
 
-    # In classic mode, check for shared game_state.md
+    # Check shared game files (used by classic and gunboat modes)
     if not fow_enabled:
         shared_state = data_dir / 'game_state.md'
         if shared_state.exists() and shared_state.stat().st_size > 50:
             print("Shared game_state.md: ✓ exists")
         else:
             print("Shared game_state.md: - needs content")
+
+        shared_history = data_dir / 'game_history.md'
+        if shared_history.exists() and shared_history.stat().st_size > 50:
+            print("Shared game_history.md: ✓ exists")
+        else:
+            print("Shared game_history.md: - needs content")
         print()
 
-    # Check conversations directory
-    conv_dir = data_dir / config['paths']['shared_conversations_dir']
-    if conv_dir.exists():
-        conv_files = list(conv_dir.glob("*.md"))
-        print(f"Active Conversations: {len(conv_files)}")
-        for conv_file in sorted(conv_files):
-            content = conv_file.read_text()
-            msg_count = content.count('**') // 2  # Rough estimate
-            print(f"  - {conv_file.stem}: ~{msg_count} messages")
-    else:
-        print("Active Conversations: 0")
-
-    print()
+    # Check conversations directory (not relevant for gunboat)
+    if not gunboat_enabled:
+        conv_dir = data_dir / config['paths']['shared_conversations_dir']
+        if conv_dir.exists():
+            conv_files = list(conv_dir.glob("*.md"))
+            print(f"Active Conversations: {len(conv_files)}")
+            for conv_file in sorted(conv_files):
+                content = conv_file.read_text()
+                msg_count = content.count('**') // 2  # Rough estimate
+                print(f"  - {conv_file.stem}: ~{msg_count} messages")
+        else:
+            print("Active Conversations: 0")
+        print()
 
     for country in countries:
         country_dir = data_dir / country
@@ -420,7 +467,7 @@ def show_status():
             print("  ! Directory not found - run initialize_game.py")
             continue
 
-        # Check game_state (only in FoW mode)
+        # Check per-country game files (only in FoW mode)
         if fow_enabled:
             game_state_file = country_dir / config['paths']['game_state']
             if game_state_file.exists() and game_state_file.stat().st_size > 100:
@@ -428,14 +475,13 @@ def show_status():
             else:
                 print("  - game_state.md needs content")
 
-        # Check game_history
-        game_history_file = country_dir / config['paths']['game_history']
-        if game_history_file.exists() and game_history_file.stat().st_size > 100:
-            print("  ✓ Has game_history.md")
-        else:
-            print("  - game_history.md needs content")
+            game_history_file = country_dir / config['paths']['game_history']
+            if game_history_file.exists() and game_history_file.stat().st_size > 100:
+                print("  ✓ Has game_history.md")
+            else:
+                print("  - game_history.md needs content")
 
-        # List other files
+        # List other files (agent's own files)
         other_files = [f.name for f in country_dir.glob("*.md")
                       if f.name not in {config['paths']['game_state'], config['paths']['game_history']}]
         if other_files:
@@ -444,26 +490,46 @@ def show_status():
         print()
 
 
+def show_help(config: dict):
+    """Show help text with available commands."""
+    countries = get_all_countries(config)
+    gunboat = is_gunboat(config)
+    fow = is_fow(config)
+
+    mode = "Gunboat" if gunboat else ("Fog of War" if fow else "Classic")
+
+    print("Diplomacy LLM CLI")
+    print(f"Current mode: {mode}")
+    print()
+    print("Commands:")
+    print("  season              Run a full season (planning + orders)")
+    print("  orders              Collect orders from all countries")
+    print("  randomize           Randomize and save turn order to turn_order.txt")
+    print("  all                 Run turns for all countries (from turn_order.txt)")
+    print("  <country>           Run a single turn for a country")
+    print("  reflect [country]   Strategic reflection (all countries, or one if specified)")
+    print("  query <country> \"question\"  Ask a country a direct question")
+    if not gunboat:
+        print("  overseer            Analyze conversations for loose ends")
+    print("  status              Show game status and file info")
+    print("  cleanup             Remove all game files (reset)")
+    print("  help, -h, --help    Show this help message")
+    print()
+    print(f"Countries: {', '.join(countries)}")
+    print()
+    if gunboat:
+        print("Gunboat mode: No diplomacy - 1 planning turn, then mandatory orders.")
+    else:
+        print(f"Classic mode: {config.get('season', {}).get('turn_rounds', 2)} turn rounds, then orders (can PASS).")
+
+
 def main():
     config = load_config()
     countries = get_all_countries(config)
 
-    if len(sys.argv) < 2:
-        print("Diplomacy LLM CLI")
-        print()
-        print("Usage:")
-        print("  python diplomacy.py <country>         # Run a turn for a country")
-        print("  python diplomacy.py reflect <country> # Strategic reflection session")
-        print("  python diplomacy.py randomize         # Randomize and save turn order")
-        print("  python diplomacy.py all               # Run turns for all countries (from turn_order.txt)")
-        print("  python diplomacy.py season            # Run full season (turns + orders loop)")
-        print("  python diplomacy.py orders            # Collect orders (countries can PASS)")
-        print("  python diplomacy.py overseer          # Analyze conversations for loose ends")
-        print("  python diplomacy.py status            # Show game status")
-        print("  python diplomacy.py cleanup           # Remove all game files (reset)")
-        print("  python diplomacy.py query <country> <question>  # Ask a country a direct question")
-        print(f"\nCountries: {', '.join(countries)}")
-        sys.exit(1)
+    if len(sys.argv) < 2 or sys.argv[1].lower() in ('help', '-h', '--help'):
+        show_help(config)
+        sys.exit(0 if len(sys.argv) >= 2 else 1)
 
     command = sys.argv[1].lower()
 
@@ -483,16 +549,20 @@ def main():
     elif command == "cleanup":
         cleanup()
     elif command == "reflect":
-        if len(sys.argv) < 3:
-            print("Usage: python diplomacy.py reflect <country>")
-            print(f"Countries: {', '.join(countries)}")
-            sys.exit(1)
-        country = find_country(sys.argv[2], countries)
-        if country is None:
-            print(f"Error: '{sys.argv[2]}' is not a recognized country")
-            print(f"Countries: {', '.join(countries)}")
-            sys.exit(1)
-        run_reflect(country)
+        if len(sys.argv) >= 3:
+            # Single country reflection
+            country = find_country(sys.argv[2], countries)
+            if country is None:
+                print(f"Error: '{sys.argv[2]}' is not a recognized country")
+                print(f"Countries: {', '.join(countries)}")
+                sys.exit(1)
+            run_reflect(country)
+        else:
+            # All countries reflection
+            print_section_header("REFLECTION PHASE")
+            for country in countries:
+                run_reflect(country)
+                print()
     elif command == "query":
         if len(sys.argv) < 4:
             print("Usage: python diplomacy.py query <country> <question>")

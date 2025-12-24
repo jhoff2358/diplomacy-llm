@@ -19,6 +19,11 @@ def is_fow(config: dict) -> bool:
     return config.get('features', {}).get('fog_of_war', False)
 
 
+def is_gunboat(config: dict) -> bool:
+    """Check if gunboat mode is enabled (no diplomacy)."""
+    return config.get('features', {}).get('gunboat', False)
+
+
 def get_current_season(config: dict) -> str:
     """Get the current season from game_state.md.
 
@@ -27,7 +32,7 @@ def get_current_season(config: dict) -> str:
     """
     data_dir = Path(config['paths']['data_dir'])
 
-    # In classic mode, read from root; in FoW mode, pick any country's file
+    # FoW uses per-country files; Classic/Gunboat use shared root file
     if is_fow(config):
         # Use first country's game_state
         countries = config.get('countries', [])

@@ -6,7 +6,6 @@ Supports both classic and fog of war modes.
 
 import os
 import re
-import shutil
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple, TypeVar
@@ -72,25 +71,9 @@ class DiplomacyAgent:
         """Check if fog of war mode is enabled."""
         return self.config.get('features', {}).get('fog_of_war', False)
 
-    def sync_shared_files(self):
-        """In classic mode, copy root game_state.md and game_history.md to country folder."""
-        if self.is_fow():
-            return  # FoW mode uses per-country files directly
-
-        self.country_dir.mkdir(parents=True, exist_ok=True)
-        data_dir = Path(self.config['paths']['data_dir'])
-
-        # Copy shared game_state.md
-        shared_state = data_dir / 'game_state.md'
-        if shared_state.exists():
-            country_state = self.country_dir / self.config['paths']['game_state']
-            shutil.copy(shared_state, country_state)
-
-        # Copy shared game_history.md
-        shared_history = data_dir / 'game_history.md'
-        if shared_history.exists():
-            country_history = self.country_dir / self.config['paths']['game_history']
-            shutil.copy(shared_history, country_history)
+    def is_gunboat(self) -> bool:
+        """Check if gunboat mode is enabled (no diplomacy)."""
+        return self.config.get('features', {}).get('gunboat', False)
 
     def initialize_session(self):
         """Initialize or reset the chat session with current context."""
@@ -99,12 +82,35 @@ class DiplomacyAgent:
         # Start new chat with full context
         self.chat = self.model.start_chat(history=[])
 
-        # Send initial context as system-like message
-        initial_prompt = f"""{context}
+        # Build prompt based on mode
+        if self.is_gunboat():
+            initial_prompt = f"""{context}
 
 ---
 
-What would you like to do this turn? You may send messages, update your notes, or both.
+**YOUR TURN**
+
+First, briefly react to what happened last season (or the current board state if this is the start). What surprised you? What went as expected? How does this change your thinking?
+
+Then, analyze the board and submit your orders. You must:
+1. Update your notes with your strategic thinking
+2. Write your orders to orders.md (use mode="edit" to replace previous orders)
+
+Order format (one per line):
+- A Par - Bur (Army Paris moves to Burgundy)
+- F Lon - NTH (Fleet London moves to North Sea)
+- A Mun S A Par - Bur (Army Munich supports Army Paris to Burgundy)
+- A Vie H (Army Vienna holds)
+
+No messaging is allowed in gunboat mode."""
+        else:
+            initial_prompt = f"""{context}
+
+---
+
+First, briefly react to what happened last season (or the current board state if this is the start). What surprised you? What went as expected? How does this change your thinking?
+
+Then decide what to do this turn. You may send messages, update your notes, or both.
 
 If you have nothing to add right now, simply respond with **PASS** - there's no need to act on every turn."""
 
@@ -117,12 +123,48 @@ If you have nothing to add right now, simply respond with **PASS** - there's no 
         # Start new chat with full context
         self.chat = self.model.start_chat(history=[])
 
-        initial_prompt = f"""You are playing as {self.country}. This is a STRATEGIC REFLECTION session.
+        if self.is_gunboat():
+            initial_prompt = f"""You are playing as {self.country}. This is a STRATEGIC REFLECTION session.
 
 A year has passed. This is your opportunity to step back and think about the big picture before the next year begins.
 
 **PURPOSE:**
 - Review what happened this past year
+- Analyze your current position and trajectory
+- Plan your approach for the coming year
+- Clean up and reorganize your notes and files
+- Submit your orders for the upcoming season
+
+**FILE MANAGEMENT:**
+Use this time to consolidate your thinking. You can create new files or manage existing ones:
+- Append new insights (or create a new file)
+- Edit files to restructure or condense them
+- Delete files that are no longer relevant
+
+<FILE name="filename.md" mode="append|edit|delete">content</FILE>
+
+**ORDERS:** Write your orders to orders.md (use mode="edit" to replace previous orders).
+
+Order format (one per line):
+- A Par - Bur (Army Paris moves to Burgundy)
+- F Lon - NTH (Fleet London moves to North Sea)
+- A Mun S A Par - Bur (Army Munich supports Army Paris to Burgundy)
+- A Vie H (Army Vienna holds)
+
+---
+
+{context}
+
+---
+
+Reflect on the past year, reorganize your files, and submit your orders:"""
+        else:
+            initial_prompt = f"""You are playing as {self.country}. This is a STRATEGIC REFLECTION session.
+
+A year has passed. This is your opportunity to step back and think about the big picture before the next year begins.
+
+**PURPOSE:**
+- Review what happened this past year, including successes and mistakes
 - Analyze your current position and trajectory
 - Evaluate which alliances are serving you and which are not
 - Plan your approach for the coming year
@@ -164,19 +206,20 @@ Reflect on the past year and prepare for the next:"""
             'files': []
         }
 
-        # Parse MESSAGE tags
-        message_pattern = r'<MESSAGE\s+to="([^"]+)"\s*>(.*?)</MESSAGE>'
-        for match in re.finditer(message_pattern, response_text, re.DOTALL | re.IGNORECASE):
-            recipients = match.group(1)
-            message_content = match.group(2).strip()
+        # Parse MESSAGE tags (skip in gunboat mode)
+        if not self.is_gunboat():
+            message_pattern = r'<MESSAGE\s+to="([^"]+)"\s*>(.*?)</MESSAGE>'
+            for match in re.finditer(message_pattern, response_text, re.DOTALL | re.IGNORECASE):
+                recipients = match.group(1)
+                message_content = match.group(2).strip()
 
-            # Parse recipient list
-            recipient_list = [r.strip() for r in recipients.split(',')]
+                # Parse recipient list
+                recipient_list = [r.strip() for r in recipients.split(',')]
 
-            actions['messages'].append({
-                'to': recipient_list,
-                'content': message_content
-            })
+                actions['messages'].append({
+                    'to': recipient_list,
+                    'content': message_content
+                })
 
         # Parse FILE tags
         # Supports: <FILE name="x.md">, <FILE name="x.md" mode="append">, etc.
@@ -206,7 +249,8 @@ Reflect on the past year and prepare for the next:"""
 
     def take_turn(self, season: str = None) -> Tuple[str, Dict[str, Any]]:
         """Take a turn: show context and get LLM response."""
-        self.sync_shared_files()  # Copy shared files in classic mode
+        # Country dir must exist for file operations
+        self.country_dir.mkdir(parents=True, exist_ok=True)
         prompt = self.initialize_session()
 
         # Get response from LLM with retry (includes .text access which can also fail)
@@ -223,7 +267,8 @@ Reflect on the past year and prepare for the next:"""
 
     def take_reflect_turn(self) -> Tuple[str, Dict[str, Any]]:
         """Take a reflection turn focused on strategic thinking."""
-        self.sync_shared_files()  # Copy shared files in classic mode
+        # Country dir must exist for file operations
+        self.country_dir.mkdir(parents=True, exist_ok=True)
         prompt = self.initialize_reflect_session()
 
         # Get response from LLM with retry (includes .text access which can also fail)
@@ -300,16 +345,32 @@ Reflect on the past year and prepare for the next:"""
     def get_orders(self) -> str:
         """Ask the agent for their orders for this phase.
 
-        Returns orders or "PASS" if more diplomacy time is needed.
-        Uses the main model for better judgment.
+        In classic mode: Returns orders or "PASS" if more diplomacy time is needed.
+        In gunboat mode: Orders are mandatory, no PASS option.
         """
-        self.sync_shared_files()  # Copy shared files in classic mode
+        # Country dir must exist for file operations
+        self.country_dir.mkdir(parents=True, exist_ok=True)
         context = self.context_loader.format_context()
 
-        # Use main model for orders (better judgment on pass vs submit)
         chat = self.model.start_chat(history=[])
 
-        prompt = f"""{context}
+        if self.is_gunboat():
+            prompt = f"""{context}
+
+---
+
+**ORDERS PHASE**
+
+Submit your orders for this phase. Output your orders, one per line, using standard Diplomacy notation:
+- A Par - Bur (Army Paris moves to Burgundy)
+- F Lon - NTH (Fleet London moves to North Sea)
+- A Mun S A Par - Bur (Army Munich supports Army Paris to Burgundy)
+- F NTH C A Lon - Bel (Fleet North Sea convoys Army London to Belgium)
+- A Vie H (Army Vienna holds)
+
+Output ONLY your orders, no commentary."""
+        else:
+            prompt = f"""{context}
 
 ---
 
@@ -345,7 +406,8 @@ Do NOT include any messages or file operations. Output only your orders OR "PASS
 
         No messages or file operations - just a direct response.
         """
-        self.sync_shared_files()  # Copy shared files in classic mode
+        # Country dir must exist for file operations
+        self.country_dir.mkdir(parents=True, exist_ok=True)
         context = self.context_loader.format_context()
 
         chat = self.model.start_chat(history=[])
