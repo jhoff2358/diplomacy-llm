@@ -3,10 +3,24 @@ Shared utility functions for Diplomacy LLM.
 Centralizes common patterns used across modules.
 """
 
+import traceback
 from pathlib import Path
 from typing import Optional, List
 import yaml
 
+
+# =============================================================================
+# Constants
+# =============================================================================
+
+DIVIDER_WIDTH = 60
+OVERSEER_LINE_LIMIT = 100
+MIN_FILE_SIZE = 100
+
+
+# =============================================================================
+# Configuration
+# =============================================================================
 
 def load_config(config_path: str = "config.yaml") -> dict:
     """Load and return the game configuration."""
@@ -71,8 +85,59 @@ def find_country(name: str, countries: List[str]) -> Optional[str]:
     return None
 
 
-def print_section_header(title: str, width: int = 60):
+def print_section_header(title: str, width: int = DIVIDER_WIDTH):
     """Print a formatted section header."""
     print(f"\n{'='*width}")
     print(title)
     print(f"{'='*width}\n")
+
+
+def print_divider():
+    """Print a horizontal divider line."""
+    print("-" * DIVIDER_WIDTH)
+
+
+# =============================================================================
+# Mode Helpers
+# =============================================================================
+
+def get_mode_name(config: dict) -> str:
+    """Get the display name for the current game mode."""
+    if is_gunboat(config):
+        return "Gunboat"
+    elif is_fow(config):
+        return "Fog of War"
+    else:
+        return "Classic"
+
+
+# =============================================================================
+# Path Helpers
+# =============================================================================
+
+def get_data_dir(config: dict) -> Path:
+    """Get the data directory path."""
+    return Path(config['paths']['data_dir'])
+
+
+def get_conversations_dir(config: dict) -> Path:
+    """Get the shared conversations directory path."""
+    return get_data_dir(config) / config['paths']['shared_conversations_dir']
+
+
+def get_country_dir(config: dict, country: str) -> Path:
+    """Get a country's data directory path."""
+    return get_data_dir(config) / country
+
+
+# =============================================================================
+# Error Handling
+# =============================================================================
+
+def handle_error(e: Exception, context: str = ""):
+    """Print error with traceback in a consistent format."""
+    if context:
+        print(f"Error in {context}: {e}")
+    else:
+        print(f"Error: {e}")
+    traceback.print_exc()

@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 import yaml
 
 from context import ContextLoader
+from utils import is_fow, is_gunboat, get_country_dir
 
 T = TypeVar('T')
 
@@ -46,8 +47,9 @@ class DiplomacyAgent:
         # Context loader
         self.context_loader = ContextLoader(country, config_path)
 
-        # Country directory
-        self.country_dir = Path(self.config['paths']['data_dir']) / country
+        # Country directory - create on init
+        self.country_dir = get_country_dir(self.config, country)
+        self.country_dir.mkdir(parents=True, exist_ok=True)
 
         # Retry settings
         self.max_retries = self.config.get('api', {}).get('max_retries', 2)
@@ -67,14 +69,6 @@ class DiplomacyAgent:
                     time.sleep(wait_time)
         raise last_error
 
-    def is_fow(self) -> bool:
-        """Check if fog of war mode is enabled."""
-        return self.config.get('features', {}).get('fog_of_war', False)
-
-    def is_gunboat(self) -> bool:
-        """Check if gunboat mode is enabled (no diplomacy)."""
-        return self.config.get('features', {}).get('gunboat', False)
-
     def initialize_session(self):
         """Initialize or reset the chat session with current context."""
         context = self.context_loader.format_context()
@@ -83,7 +77,7 @@ class DiplomacyAgent:
         self.chat = self.model.start_chat(history=[])
 
         # Build prompt based on mode
-        if self.is_gunboat():
+        if is_gunboat(self.config):
             initial_prompt = f"""{context}
 
 ---
@@ -123,7 +117,7 @@ If you have nothing to add right now, simply respond with **PASS** - there's no 
         # Start new chat with full context
         self.chat = self.model.start_chat(history=[])
 
-        if self.is_gunboat():
+        if is_gunboat(self.config):
             initial_prompt = f"""You are playing as {self.country}. This is a STRATEGIC REFLECTION session.
 
 A year has passed. This is your opportunity to step back and think about the big picture before the next year begins.
@@ -207,7 +201,7 @@ Reflect on the past year and prepare for the next:"""
         }
 
         # Parse MESSAGE tags (skip in gunboat mode)
-        if not self.is_gunboat():
+        if not is_gunboat(self.config):
             message_pattern = r'<MESSAGE\s+to="([^"]+)"\s*>(.*?)</MESSAGE>'
             for match in re.finditer(message_pattern, response_text, re.DOTALL | re.IGNORECASE):
                 recipients = match.group(1)
@@ -249,8 +243,6 @@ Reflect on the past year and prepare for the next:"""
 
     def take_turn(self, season: str = None) -> Tuple[str, Dict[str, Any]]:
         """Take a turn: show context and get LLM response."""
-        # Country dir must exist for file operations
-        self.country_dir.mkdir(parents=True, exist_ok=True)
         prompt = self.initialize_session()
 
         # Get response from LLM with retry (includes .text access which can also fail)
@@ -267,8 +259,6 @@ Reflect on the past year and prepare for the next:"""
 
     def take_reflect_turn(self) -> Tuple[str, Dict[str, Any]]:
         """Take a reflection turn focused on strategic thinking."""
-        # Country dir must exist for file operations
-        self.country_dir.mkdir(parents=True, exist_ok=True)
         prompt = self.initialize_reflect_session()
 
         # Get response from LLM with retry (includes .text access which can also fail)
@@ -348,13 +338,11 @@ Reflect on the past year and prepare for the next:"""
         In classic mode: Returns orders or "PASS" if more diplomacy time is needed.
         In gunboat mode: Orders are mandatory, no PASS option.
         """
-        # Country dir must exist for file operations
-        self.country_dir.mkdir(parents=True, exist_ok=True)
         context = self.context_loader.format_context()
 
         chat = self.model.start_chat(history=[])
 
-        if self.is_gunboat():
+        if is_gunboat(self.config):
             prompt = f"""{context}
 
 ---
@@ -406,8 +394,6 @@ Do NOT include any messages or file operations. Output only your orders OR "PASS
 
         No messages or file operations - just a direct response.
         """
-        # Country dir must exist for file operations
-        self.country_dir.mkdir(parents=True, exist_ok=True)
         context = self.context_loader.format_context()
 
         chat = self.model.start_chat(history=[])

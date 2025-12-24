@@ -5,8 +5,10 @@ Supports both classic and fog of war modes.
 """
 
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 import yaml
+
+from utils import is_fow, is_gunboat, get_data_dir, get_country_dir, get_conversations_dir
 
 
 class ContextLoader:
@@ -23,26 +25,18 @@ class ContextLoader:
         limit = self.config.get('context', {}).get('conversation_line_limit', 0)
         self.conversation_line_limit = limit if limit > 0 else None
 
-        # Set up paths
-        self.data_dir = Path(self.config['paths']['data_dir'])
-        self.country_dir = self.data_dir / country
-        self.conversations_dir = self.data_dir / self.config['paths']['shared_conversations_dir']
+        # Set up paths using utils
+        self.data_dir = get_data_dir(self.config)
+        self.country_dir = get_country_dir(self.config, country)
+        self.conversations_dir = get_conversations_dir(self.config)
 
         # Per-country files
         self.game_history_file = self.country_dir / self.config['paths']['game_history']
         self.game_state_file = self.country_dir / self.config['paths']['game_state']
 
-    def is_fow(self) -> bool:
-        """Check if fog of war mode is enabled."""
-        return self.config.get('features', {}).get('fog_of_war', False)
-
-    def is_gunboat(self) -> bool:
-        """Check if gunboat mode is enabled (no diplomacy)."""
-        return self.config.get('features', {}).get('gunboat', False)
-
     def load_game_history(self) -> str:
         """Load game history. FoW uses per-country files; classic/gunboat use shared."""
-        if self.is_fow():
+        if is_fow(self.config):
             path = self.game_history_file  # Per-country file
         else:
             path = self.data_dir / self.config['paths']['game_history']  # Shared file
@@ -53,7 +47,7 @@ class ContextLoader:
 
     def load_game_state(self) -> str:
         """Load game state. FoW uses per-country files; classic/gunboat use shared."""
-        if self.is_fow():
+        if is_fow(self.config):
             path = self.game_state_file  # Per-country file
         else:
             path = self.data_dir / self.config['paths']['game_state']  # Shared file
@@ -87,7 +81,7 @@ class ContextLoader:
         conversations = {}
 
         # No conversations in gunboat mode
-        if self.is_gunboat():
+        if is_gunboat(self.config):
             return conversations
 
         if not self.conversations_dir.exists():
@@ -125,7 +119,7 @@ class ContextLoader:
         conversations = self.load_conversations()
 
         # Build intro and rules based on mode
-        if self.is_gunboat():
+        if is_gunboat(self.config):
             intro = f"You are playing as {self.country} in a game of GUNBOAT Diplomacy."
             rules_section = """
 **GUNBOAT RULES:**
@@ -133,7 +127,7 @@ class ContextLoader:
 - You can only analyze the board and submit orders
 - Use your files to track your strategic thinking
 """
-        elif self.is_fow():
+        elif is_fow(self.config):
             intro = f"You are playing as {self.country} in a game of Fog of War Diplomacy."
             rules_section = """
 **FOG OF WAR RULES:**
@@ -164,7 +158,7 @@ Recommended: Use append during the season, edit/delete during reflect phase to r
 """
 
         # Only show messaging instructions if not gunboat
-        if not self.is_gunboat():
+        if not is_gunboat(self.config):
             context += """
 **MESSAGING:**
 <MESSAGE to="Country">Your message</MESSAGE>
@@ -193,7 +187,7 @@ Recommended: Use append during the season, edit/delete during reflect phase to r
             context += "\nNo files yet. Create some to organize your thoughts!\n"
 
         # Only show conversation section if not gunboat
-        if not self.is_gunboat():
+        if not is_gunboat(self.config):
             context += "\n---\n\n# CONVERSATION HISTORY\n"
 
             if conversations:
@@ -212,7 +206,7 @@ Recommended: Use append during the season, edit/delete during reflect phase to r
 
     def get_conversation_file(self, participants: List[str]) -> Path:
         """Get the path to a conversation file. Not used in gunboat mode."""
-        if not self.is_gunboat():
+        if not is_gunboat(self.config):
             self.conversations_dir.mkdir(parents=True, exist_ok=True)
         filename = self.get_conversation_filename(participants)
         return self.conversations_dir / filename
