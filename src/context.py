@@ -1,14 +1,15 @@
 """
 Context loader for Diplomacy agents.
 Loads and formats all context needed for a country to make decisions.
-Supports both classic and fog of war modes.
+Supports classic, fog of war, and gunboat modes (and combinations).
 """
 
 from pathlib import Path
 from typing import Dict, List
 import yaml
 
-from .utils import is_fow, is_gunboat, get_data_dir, get_country_dir, get_conversations_dir
+from .mode_loader import ModeLoader
+from .utils import is_fow, get_data_dir, get_country_dir, get_conversations_dir
 
 
 class ContextLoader:
@@ -80,8 +81,9 @@ class ContextLoader:
         """Load all conversation files where this country is a participant."""
         conversations = {}
 
-        # No conversations in gunboat mode
-        if is_gunboat(self.config):
+        # No conversations if messaging is disabled
+        mode_loader = ModeLoader(self.config)
+        if not mode_loader.is_feature_enabled("messaging_instructions"):
             return conversations
 
         if not self.conversations_dir.exists():
@@ -111,59 +113,35 @@ class ContextLoader:
         return conversations
 
     def format_context(self) -> str:
-        """Format all context into a single prompt for the LLM."""
+        """Format all context into a single prompt for the LLM.
 
+        Combines mode-specific prompts with game data.
+        """
+        mode_loader = ModeLoader(self.config)
+
+        # Load game data
         game_state = self.load_game_state()
         game_history = self.load_game_history()
         country_files = self.load_country_files()
         conversations = self.load_conversations()
 
-        # Build intro and rules based on mode
-        if is_gunboat(self.config):
-            intro = f"You are playing as {self.country} in a game of GUNBOAT Diplomacy."
-            rules_section = """
-**GUNBOAT RULES:**
-- No communication with other countries is allowed
-- You can only analyze the board and submit orders
-- Use your files to track your strategic thinking
-"""
-        elif is_fow(self.config):
-            intro = f"You are playing as {self.country} in a game of Fog of War Diplomacy."
-            rules_section = """
-**FOG OF WAR RULES:**
-- You can only see territories adjacent to your HOME supply centers and units
-- Your game_state shows what you currently see
-- Your game_history shows orders/results you witnessed
-- You can only MESSAGE countries listed in your game_state
-- You can READ all conversation history
+        # Build context from mode templates
+        header = mode_loader.get_prompt("context_header", {"country": self.country})
+        rules = mode_loader.get_prompt("rules")
+        file_mgmt = mode_loader.get_prompt("file_management")
 
-**IMPORTANT:** If a territory is listed in your game_state without a unit, it is CONFIRMED EMPTY. You have full visibility there - no need to speculate about hidden units.
-"""
-        else:
-            intro = f"You are playing as {self.country} in a game of Diplomacy."
-            rules_section = ""
+        context = f"{header}\n"
 
-        # Build the context prompt
-        context = f"""{intro}
-{rules_section}
-**FILE MANAGEMENT:**
-You can create and manage your own files to organize your thoughts however you like.
-<FILE name="filename.md" mode="append|edit|delete">content</FILE>
+        if rules:
+            context += f"\n{rules}\n"
 
-- mode="append" (default): Add to end of file, or create new file
-- mode="edit": Replace entire file contents
-- mode="delete": Remove file
+        context += f"\n{file_mgmt}\n"
 
-Recommended: Use append during the season, edit/delete during reflect phase to reorganize.
-"""
+        if mode_loader.is_feature_enabled("messaging_instructions"):
+            messaging = mode_loader.get_prompt("messaging_instructions")
+            context += f"\n{messaging}\n"
 
-        # Only show messaging instructions if not gunboat
-        if not is_gunboat(self.config):
-            context += """
-**MESSAGING:**
-<MESSAGE to="Country">Your message</MESSAGE>
-"""
-
+        # Add game data sections
         context += f"""
 ---
 
@@ -186,8 +164,8 @@ Recommended: Use append during the season, edit/delete during reflect phase to r
         else:
             context += "\nNo files yet. Create some to organize your thoughts!\n"
 
-        # Only show conversation section if not gunboat
-        if not is_gunboat(self.config):
+        # Only show conversation section if messaging is enabled
+        if mode_loader.is_feature_enabled("messaging_instructions"):
             context += "\n---\n\n# CONVERSATION HISTORY\n"
 
             if conversations:
@@ -205,8 +183,9 @@ Recommended: Use append during the season, edit/delete during reflect phase to r
         return '-'.join(all_participants) + '.md'
 
     def get_conversation_file(self, participants: List[str]) -> Path:
-        """Get the path to a conversation file. Not used in gunboat mode."""
-        if not is_gunboat(self.config):
+        """Get the path to a conversation file. Not used if messaging disabled."""
+        mode_loader = ModeLoader(self.config)
+        if mode_loader.is_feature_enabled("messaging_instructions"):
             self.conversations_dir.mkdir(parents=True, exist_ok=True)
         filename = self.get_conversation_filename(participants)
         return self.conversations_dir / filename

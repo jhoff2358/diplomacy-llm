@@ -1,7 +1,7 @@
 """
 Agent manager for Diplomacy countries.
 Manages Gemini chat sessions and handles country actions.
-Supports both classic and fog of war modes.
+Supports classic, fog of war, gunboat modes (and combinations).
 """
 
 import os
@@ -14,7 +14,8 @@ from dotenv import load_dotenv
 import yaml
 
 from .context import ContextLoader
-from .utils import is_fow, is_gunboat, get_country_dir
+from .mode_loader import ModeLoader
+from .utils import get_country_dir
 
 T = TypeVar('T')
 
@@ -72,117 +73,30 @@ class DiplomacyAgent:
     def initialize_session(self):
         """Initialize or reset the chat session with current context."""
         context = self.context_loader.format_context()
+        mode_loader = ModeLoader(self.config)
 
         # Start new chat with full context
         self.chat = self.model.start_chat(history=[])
 
-        # Build prompt based on mode
-        if is_gunboat(self.config):
-            initial_prompt = f"""{context}
-
----
-
-**YOUR TURN**
-
-First, briefly react to what happened last season (or the current board state if this is the start). What surprised you? What went as expected? How does this change your thinking?
-
-Then, analyze the board and submit your orders. You must:
-1. Update your notes with your strategic thinking
-2. Write your orders to orders.md (use mode="edit" to replace previous orders)
-
-Order format (one per line):
-- A Par - Bur (Army Paris moves to Burgundy)
-- F Lon - NTH (Fleet London moves to North Sea)
-- A Mun S A Par - Bur (Army Munich supports Army Paris to Burgundy)
-- A Vie H (Army Vienna holds)
-
-No messaging is allowed in gunboat mode."""
-        else:
-            initial_prompt = f"""{context}
-
----
-
-First, briefly react to what happened last season (or the current board state if this is the start). What surprised you? What went as expected? How does this change your thinking?
-
-Then decide what to do this turn. You may send messages, update your notes, or both.
-
-If you have nothing to add right now, simply respond with **PASS** - there's no need to act on every turn."""
-
-        return initial_prompt
+        # Load turn prompt from mode templates
+        return mode_loader.get_prompt("turn", {
+            "context": context,
+            "country": self.country
+        })
 
     def initialize_reflect_session(self):
         """Initialize a reflection session focused on strategic thinking."""
         context = self.context_loader.format_context()
+        mode_loader = ModeLoader(self.config)
 
         # Start new chat with full context
         self.chat = self.model.start_chat(history=[])
 
-        if is_gunboat(self.config):
-            initial_prompt = f"""You are playing as {self.country}. This is a STRATEGIC REFLECTION session.
-
-A year has passed. This is your opportunity to step back and think about the big picture before the next year begins.
-
-**PURPOSE:**
-- Review what happened this past year
-- Analyze your current position and trajectory
-- Plan your approach for the coming year
-- Clean up and reorganize your notes and files
-- Submit your orders for the upcoming season
-
-**FILE MANAGEMENT:**
-Use this time to consolidate your thinking. You can create new files or manage existing ones:
-- Append new insights (or create a new file)
-- Edit files to restructure or condense them
-- Delete files that are no longer relevant
-
-<FILE name="filename.md" mode="append|edit|delete">content</FILE>
-
-**ORDERS:** Write your orders to orders.md (use mode="edit" to replace previous orders).
-
-Order format (one per line):
-- A Par - Bur (Army Paris moves to Burgundy)
-- F Lon - NTH (Fleet London moves to North Sea)
-- A Mun S A Par - Bur (Army Munich supports Army Paris to Burgundy)
-- A Vie H (Army Vienna holds)
-
----
-
-{context}
-
----
-
-Reflect on the past year, reorganize your files, and submit your orders:"""
-        else:
-            initial_prompt = f"""You are playing as {self.country}. This is a STRATEGIC REFLECTION session.
-
-A year has passed. This is your opportunity to step back and think about the big picture before the next year begins.
-
-**PURPOSE:**
-- Review what happened this past year, including successes and mistakes
-- Analyze your current position and trajectory
-- Evaluate which alliances are serving you and which are not
-- Plan your approach for the coming year
-- Clean up and reorganize your notes and files
-
-**FILE MANAGEMENT:**
-Use this time to consolidate your thinking. You can create new files or manage existing ones:
-- Append new insights (or create a new file)
-- Edit files to restructure or condense them
-- Delete files that are no longer relevant
-
-<FILE name="filename.md" mode="append|edit|delete">content</FILE>
-
-**NO MESSAGING:** This is private reflection time. Messages cannot be sent during this session.
-
----
-
-{context}
-
----
-
-Reflect on the past year and prepare for the next:"""
-
-        return initial_prompt
+        # Load reflect prompt from mode templates
+        return mode_loader.get_prompt("reflect", {
+            "context": context,
+            "country": self.country
+        })
 
     def parse_response(self, response_text: str) -> Dict[str, Any]:
         """Parse XML-style tags from LLM response.
@@ -200,8 +114,9 @@ Reflect on the past year and prepare for the next:"""
             'files': []
         }
 
-        # Parse MESSAGE tags (skip in gunboat mode)
-        if not is_gunboat(self.config):
+        # Parse MESSAGE tags (skip if messaging disabled)
+        mode_loader = ModeLoader(self.config)
+        if mode_loader.is_feature_enabled("messaging_instructions"):
             message_pattern = r'<MESSAGE\s+to="([^"]+)"\s*>(.*?)</MESSAGE>'
             for match in re.finditer(message_pattern, response_text, re.DOTALL | re.IGNORECASE):
                 recipients = match.group(1)
@@ -335,53 +250,19 @@ Reflect on the past year and prepare for the next:"""
     def get_orders(self) -> str:
         """Ask the agent for their orders for this phase.
 
-        In classic mode: Returns orders or "PASS" if more diplomacy time is needed.
-        In gunboat mode: Orders are mandatory, no PASS option.
+        With messaging enabled: Returns orders or "PASS" if more diplomacy time is needed.
+        Without messaging: Orders are mandatory, no PASS option.
         """
         context = self.context_loader.format_context()
+        mode_loader = ModeLoader(self.config)
 
         chat = self.model.start_chat(history=[])
 
-        if is_gunboat(self.config):
-            prompt = f"""{context}
-
----
-
-**ORDERS PHASE**
-
-Submit your orders for this phase. Output your orders, one per line, using standard Diplomacy notation:
-- A Par - Bur (Army Paris moves to Burgundy)
-- F Lon - NTH (Fleet London moves to North Sea)
-- A Mun S A Par - Bur (Army Munich supports Army Paris to Burgundy)
-- F NTH C A Lon - Bel (Fleet North Sea convoys Army London to Belgium)
-- A Vie H (Army Vienna holds)
-
-Output ONLY your orders, no commentary."""
-        else:
-            prompt = f"""{context}
-
----
-
-**ORDERS PHASE**
-
-It is time to submit your orders for this phase. Before deciding, consider:
-
-1. Are there any unanswered questions in your conversations that could affect your strategy?
-2. Are there pending negotiations or proposals you're waiting on?
-3. Do you have enough information to confidently submit orders?
-
-You have two options:
-
-**Submit orders** - Output your orders, one per line, using standard Diplomacy notation:
-- A Par - Bur (Army Paris moves to Burgundy)
-- F Lon - NTH (Fleet London moves to North Sea)
-- A Mun S A Par - Bur (Army Munich supports Army Paris to Burgundy)
-- F NTH C A Lon - Bel (Fleet North Sea convoys Army London to Belgium)
-- A Vie H (Army Vienna holds)
-
-**PASS** - If you need more diplomacy time. You will get another round to message before orders are collected again.
-
-Do NOT include any messages or file operations. Output only your orders OR "PASS"."""
+        # Load orders prompt from mode templates
+        prompt = mode_loader.get_prompt("orders", {
+            "context": context,
+            "country": self.country
+        })
 
         def get_response():
             response = chat.send_message(prompt)

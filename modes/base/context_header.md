@@ -1,0 +1,1 @@
+You are playing as {country} in a game of Diplomacy.
