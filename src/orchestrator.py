@@ -103,6 +103,18 @@ def run_all_turns():
 # Order Collection
 # =============================================================================
 
+def _is_build_or_retreat_phase(season: str) -> bool:
+    """Check if the season is a winter build or retreat phase.
+
+    TODO: This is a temporary workaround. Countries PASS in these phases because
+    they have no builds/retreats available, not because they need more diplomacy
+    time. We should properly detect which countries have actions available and
+    only collect orders from them, rather than always storing orders.
+    """
+    season_lower = season.lower()
+    return 'winter' in season_lower or 'retreat' in season_lower
+
+
 def collect_orders(turn_order: list = None) -> bool:
     """Collect orders from all countries.
 
@@ -112,16 +124,20 @@ def collect_orders(turn_order: list = None) -> bool:
     Returns:
         True if all countries submitted orders, False if any passed.
         In gunboat mode, always returns True (no PASS option).
+        In winter/retreat phases, always returns True (countries may PASS if no builds/retreats).
     """
     print_section_header("COLLECTING ORDERS")
     config = load_config()
     season = get_current_season(config)
     countries = turn_order or get_all_countries(config)
     gunboat = is_gunboat(config)
+    build_or_retreat = _is_build_or_retreat_phase(season)
 
     print(f"Season: {season}")
     if gunboat:
         print("Mode: Gunboat (no PASS option)\n")
+    elif build_or_retreat:
+        print("Mode: Build/Retreat phase (PASS allowed, orders always saved)\n")
     else:
         print()
 
@@ -138,19 +154,24 @@ def collect_orders(turn_order: list = None) -> bool:
             # Check if they passed (only in non-gunboat mode)
             if not gunboat and "PASS" in orders.upper().split('\n')[0]:
                 passed_countries.append(country)
-                print(f"  {country} PASSED - needs more diplomacy time")
-                print(f"  Reason: {orders.strip()}")
+                if build_or_retreat:
+                    # In build/retreat, PASS means no actions available - still record it
+                    all_orders[country] = orders
+                    print(f"  {country} PASSED (no builds/retreats)")
+                else:
+                    print(f"  {country} PASSED - needs more diplomacy time")
+                    print(f"  Reason: {orders.strip()}")
             else:
                 all_orders[country] = orders
                 print(f"✓ {country}'s orders received")
 
         except Exception as e:
             print(f"✗ Error getting orders from {country}: {e}")
-            if not gunboat:
+            if not gunboat and not build_or_retreat:
                 passed_countries.append(country)
 
-    # Only write orders file if everyone submitted
-    if not passed_countries:
+    # Write orders file if everyone submitted OR if it's a build/retreat phase
+    if not passed_countries or build_or_retreat:
         with open(orders_file, 'w') as f:
             f.write(f"# Orders for {season}\n\n")
             for country in countries:

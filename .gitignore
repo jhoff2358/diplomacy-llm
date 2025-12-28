@@ -27,7 +27,9 @@ Thumbs.db
 
 # Game data (generated at runtime)
 countries/
+countries copy/
 orders.md
+turn_order.txt
 
 # Claude Code
 .claude/
