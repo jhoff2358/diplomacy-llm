@@ -19,6 +19,40 @@ from .utils import (
 
 
 # =============================================================================
+# Season Header Management
+# =============================================================================
+
+def add_season_headers():
+    """Add season headers to all conversation and void files.
+
+    Called at the start of each season to add a single header for the season,
+    rather than prepending to each message.
+    """
+    config = load_config()
+    season = get_current_season(config)
+    countries = get_all_countries(config)
+
+    header = f"\n## {season}\n"
+
+    # Add headers to all conversation files
+    from .utils import get_conversations_dir
+    conversations_dir = get_conversations_dir(config)
+    if conversations_dir.exists():
+        for conv_file in conversations_dir.glob("*.md"):
+            with open(conv_file, 'a') as f:
+                f.write(header)
+
+    # Add headers to all void files
+    from .utils import get_country_dir
+    for country in countries:
+        void_path = get_country_dir(config, country) / 'void.md'
+        with open(void_path, 'a') as f:
+            f.write(header)
+
+    print(f"✓ Added season headers ({season}) to conversations and void files")
+
+
+# =============================================================================
 # Turn Order Management
 # =============================================================================
 
@@ -282,6 +316,9 @@ def run_gunboat_season():
     print("Mode: Gunboat")
     print(f"Countries: {', '.join(countries)}\n")
 
+    # Add season headers to void files (no conversations in gunboat mode)
+    add_season_headers()
+
     # React phase - each country reacts and submits orders
     print_section_header("REACT PHASE")
     for country in countries:
@@ -314,6 +351,9 @@ def run_classic_season():
 
     turn_rounds = config.get('season', {}).get('turn_rounds', 2)
     print(f"Turn rounds: {turn_rounds}\n")
+
+    # Add season headers to conversations and void files
+    add_season_headers()
 
     # Run turn rounds (messaging + void.md only)
     for round_num in range(1, turn_rounds + 1):

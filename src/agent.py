@@ -270,18 +270,26 @@ class DiplomacyAgent:
         return response_text, actions
 
     def send_message(self, recipients: List[str], message: str, season: str = None):
-        """Send a message to one or more countries."""
+        """Send a message to one or more countries.
+
+        Args:
+            recipients: List of country names to send to
+            message: The message content
+            season: Current season (used for new conversation files only)
+        """
         # Get conversation file for these participants
         conv_file = self.context_loader.get_conversation_file(recipients)
 
-        # Format the message with season header if needed
-        season_header = f"\n## {season}\n" if season else "\n"
+        # If this is a new conversation file, add the season header
+        is_new_file = not conv_file.exists()
 
         # Format the message
-        message_text = f"{season_header}**{self.country}:** {message}\n\n"
+        message_text = f"**{self.country}:** {message}\n\n"
 
         # Append to conversation file
         with open(conv_file, 'a') as f:
+            if is_new_file and season:
+                f.write(f"## {season}\n")
             f.write(message_text)
 
         # Format recipients for display
