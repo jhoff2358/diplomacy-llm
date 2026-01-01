@@ -146,6 +146,17 @@ class DiplomacyAgent:
                     'content': message_content
                 })
 
+        # Parse NOTE tags (simple scratchpad notes -> void.md append)
+        note_pattern = r'<NOTE>(.*?)</NOTE>'
+        for match in re.finditer(note_pattern, response_text, re.DOTALL | re.IGNORECASE):
+            content = match.group(1).strip()
+            if content:
+                actions['files'].append({
+                    'name': 'void.md',
+                    'mode': 'append',
+                    'content': content
+                })
+
         # Parse FILE tags
         # Supports: <FILE name="x.md">, <FILE name="x.md" mode="append">, etc.
         file_pattern = r'<FILE\s+name="([^"]+)"(?:\s+mode="([^"]+)")?\s*>(.*?)</FILE>'
