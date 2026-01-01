@@ -19,13 +19,21 @@ Step back from the tactical grind and think honestly about the big picture.
 - What would need to change for you to break out of any stalemates?
 - How should your diplomatic approach evolve?
 
-**ORGANIZE YOUR THOUGHTS:**
-This is a good time to review your void.md scratchpad and organize important insights into your other files. You have full file access during reflection.
+**ORGANIZE YOUR COUNTRY FOLDER:**
+Review your void.md scratchpad and structure the important insights into permanent files. You have full access to your country folder during reflection. Consider creating or updating files like:
+- **strategy.md** - Your current strategic plan and priorities
+- **allies.md** - Assessment of relationships with other powers
+- **threats.md** - Key threats and how to address them
+- Any other files that help you track important information
+
+Use mode="edit" to replace file contents, mode="append" to add to existing files, or mode="delete" to remove outdated files.
+
+<FILE name="strategy.md" mode="edit">Your strategy here...</FILE>
 
 **SUBMIT YOUR ORDERS:**
 Write your orders to orders.md (use mode="edit" to replace previous orders).
 
-{block:file_management}
+<FILE name="orders.md" mode="edit">Your orders here...</FILE>
 
 **NO MESSAGING:** This is private reflection time. Messages cannot be sent.
 

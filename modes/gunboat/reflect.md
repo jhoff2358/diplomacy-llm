@@ -17,10 +17,16 @@ Step back from the tactical grind and think honestly about the big picture.
 - What are the biggest threats and opportunities you see?
 - What would need to change for you to break out of any stalemates?
 
-**ORGANIZE YOUR THOUGHTS:**
-This is a good time to review your void.md scratchpad and organize important insights into your other files. You have full file access during reflection.
+**ORGANIZE YOUR COUNTRY FOLDER:**
+Review your void.md scratchpad and structure the important insights into permanent files. You have full access to your country folder during reflection. Consider creating or updating files like:
+- **strategy.md** - Your current strategic plan and priorities
+- **threats.md** - Key threats and how to address them
+- **observations.md** - What you've learned about other powers
+- Any other files that help you track important information
 
-{block:file_management}
+Use mode="edit" to replace file contents, mode="append" to add to existing files, or mode="delete" to remove outdated files.
+
+<FILE name="strategy.md" mode="edit">Your strategy here...</FILE>
 
 **NO MESSAGING:** This is private reflection time. Messages cannot be sent.
 
@@ -30,7 +36,7 @@ This is a good time to review your void.md scratchpad and organize important ins
 
 ---
 
-Reflect honestly. Write your thoughts to your files—the act of writing helps clarify your thinking and ensures you remember key insights.
+Reflect honestly. Structure your insights from void.md into your country files—the act of organizing helps clarify your thinking and ensures you remember key lessons.
 
 {if:wipe_void}
 **NOTE:** Your void.md will be cleared after this response. Make sure to save anything important to your other files before it's wiped.

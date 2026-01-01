@@ -162,13 +162,15 @@ class DiplomacyAgent:
 
         return actions
 
-    def execute_actions(self, actions: Dict[str, Any], season: str = None, restrict_files: list = None):
+    def execute_actions(self, actions: Dict[str, Any], season: str = None,
+                        restrict_files: list = None, append_only_files: list = None):
         """Execute parsed actions.
 
         Args:
             actions: Parsed actions dict with 'messages' and 'files' lists
             season: Current season for message headers
             restrict_files: If provided, only allow writes to these files (e.g., ['void.md', 'orders.md'])
+            append_only_files: If provided, force append mode for these files (e.g., ['void.md'])
         """
         # Send messages
         for msg in actions['messages']:
@@ -177,19 +179,28 @@ class DiplomacyAgent:
         # Handle file operations
         for file_op in actions['files']:
             filename = file_op['name']
+            mode = file_op['mode']
+
+            # Normalize filename for comparison
+            normalized = filename.lower()
+            if not normalized.endswith('.md'):
+                normalized += '.md'
 
             # Enforce file restriction if specified
             if restrict_files is not None:
-                # Normalize filename for comparison
-                normalized = filename.lower()
-                if not normalized.endswith('.md'):
-                    normalized += '.md'
                 allowed = [f.lower() for f in restrict_files]
                 if normalized not in allowed:
                     print(f"  ! Skipped {filename} (only {', '.join(restrict_files)} allowed in this phase)")
                     continue
 
-            self.write_file(filename, file_op['content'], file_op['mode'])
+            # Enforce append-only for specified files
+            if append_only_files is not None:
+                append_only = [f.lower() for f in append_only_files]
+                if normalized in append_only and mode != 'append':
+                    print(f"  ! Forcing append mode for {filename} (append-only in this phase)")
+                    mode = 'append'
+
+            self.write_file(filename, file_op['content'], mode)
 
     def take_turn(self, season: str = None) -> Tuple[str, Dict[str, Any]]:
         """Take a turn: show context and get LLM response."""

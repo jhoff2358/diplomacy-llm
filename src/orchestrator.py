@@ -72,12 +72,14 @@ def run_country_turn(country: str, use_cheap_model: bool = True):
         print(response_text)
         print_divider()
 
-        # Execute actions if any were parsed (void.md only for files)
+        # Execute actions if any were parsed (void.md only, append-only)
         has_actions = (actions['messages'] or actions['files'])
 
         if has_actions:
             print(f"\nExecuting actions:")
-            agent.execute_actions(actions, season, restrict_files=['void.md'])
+            agent.execute_actions(actions, season,
+                                  restrict_files=['void.md'],
+                                  append_only_files=['void.md'])
             print(f"\n✓ Turn complete")
         else:
             print(f"\nNo actions taken this turn.")
@@ -105,12 +107,14 @@ def run_country_react(country: str):
         print(response_text)
         print_divider()
 
-        # Execute actions (void.md + orders.md only)
+        # Execute actions (void.md append-only, orders.md full access)
         has_actions = (actions['messages'] or actions['files'])
 
         if has_actions:
             print(f"\nExecuting actions:")
-            agent.execute_actions(actions, season, restrict_files=['void.md', 'orders.md'])
+            agent.execute_actions(actions, season,
+                                  restrict_files=['void.md', 'orders.md'],
+                                  append_only_files=['void.md'])
             print(f"\n✓ React complete")
         else:
             print(f"\nNo actions taken this phase.")
