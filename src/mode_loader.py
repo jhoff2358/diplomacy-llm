@@ -50,6 +50,10 @@ class ModeLoader:
             modes.append("fow")
         if features.get('gunboat', False):
             modes.append("gunboat")
+        if features.get('imperial', False):
+            modes.append("imperial")
+        if features.get('chess', False):
+            modes.append("chess")
 
         return modes
 
@@ -98,12 +102,33 @@ class ModeLoader:
         # Resolve block references: {block:name}
         result = self._resolve_blocks(result)
 
+        # Process conditionals: {if:var}...{endif}
+        if variables:
+            result = self._process_conditionals(result, variables)
+
         # Substitute variables if provided
         if variables:
             for key, value in variables.items():
                 result = result.replace(f"{{{key}}}", str(value))
 
         return result
+
+    def _process_conditionals(self, content: str, variables: Dict[str, str]) -> str:
+        """Process {if:var}...{endif} conditional blocks.
+
+        If var is truthy, include the content. Otherwise, remove the block entirely.
+        """
+        pattern = r'\{if:(\w+)\}(.*?)\{endif\}'
+
+        def replacer(match):
+            var_name = match.group(1)
+            block_content = match.group(2)
+            # Check if variable is truthy
+            if variables.get(var_name):
+                return block_content.strip()
+            return ""
+
+        return re.sub(pattern, replacer, content, flags=re.DOTALL)
 
     def _resolve_blocks(self, content: str) -> str:
         """Replace {block:name} references with loaded block content."""

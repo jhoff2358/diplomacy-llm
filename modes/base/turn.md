@@ -2,8 +2,17 @@
 
 ---
 
-First, briefly react to what happened last season (or the current board state if this is the start). What surprised you? What went as expected? How does this change your thinking?
+**YOUR TURN**
 
-Then decide what to do this turn. You may send messages, update your notes, or both.
+React to recent events. Send messages to other powers if needed.
+Write your thoughts to void.md - this is your scratchpad for the season.
 
-If you have nothing to add right now, simply respond with **PASS** - there's no need to act on every turn.
+{block:file_management}
+
+{block:messaging_instructions}
+
+**RESTRICTIONS:**
+- You can ONLY write to void.md in this phase (messages are separate)
+- No orders yet - those come during reflect
+
+If you have nothing to add right now, simply respond with **PASS**.

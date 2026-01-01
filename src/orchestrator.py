@@ -53,10 +53,10 @@ def randomize_order():
 # Individual Turn Execution
 # =============================================================================
 
-def run_country_turn(country: str):
-    """Run a single turn for a country."""
+def run_country_turn(country: str, use_cheap_model: bool = True):
+    """Run a single turn for a country (classic mode - messaging + void.md only)."""
     try:
-        agent = DiplomacyAgent(country)
+        agent = DiplomacyAgent(country, use_cheap_model=use_cheap_model)
         config = load_config()
         season = get_current_season(config)
 
@@ -72,18 +72,92 @@ def run_country_turn(country: str):
         print(response_text)
         print_divider()
 
-        # Execute actions if any were parsed
+        # Execute actions if any were parsed (void.md only for files)
         has_actions = (actions['messages'] or actions['files'])
 
         if has_actions:
             print(f"\nExecuting actions:")
-            agent.execute_actions(actions, season)
+            agent.execute_actions(actions, season, restrict_files=['void.md'])
             print(f"\n✓ Turn complete")
         else:
             print(f"\nNo actions taken this turn.")
 
     except Exception as e:
         handle_error(e, f"{country}'s turn")
+
+
+def run_country_react(country: str):
+    """Run a react phase for a country (gunboat mode - void.md + orders)."""
+    try:
+        agent = DiplomacyAgent(country, use_cheap_model=True)
+        config = load_config()
+        season = get_current_season(config)
+
+        print(f"\nCurrent Season: {season}")
+        print_section_header(f"{country}'s React")
+
+        # Take react turn
+        response_text, actions = agent.take_react_turn()
+
+        # Show LLM's response
+        print(f"{country} says:")
+        print_divider()
+        print(response_text)
+        print_divider()
+
+        # Execute actions (void.md + orders.md only)
+        has_actions = (actions['messages'] or actions['files'])
+
+        if has_actions:
+            print(f"\nExecuting actions:")
+            agent.execute_actions(actions, season, restrict_files=['void.md', 'orders.md'])
+            print(f"\n✓ React complete")
+        else:
+            print(f"\nNo actions taken this phase.")
+
+    except Exception as e:
+        handle_error(e, f"{country}'s react")
+
+
+def run_country_reflect(country: str, wipe_void: bool = False):
+    """Run a reflect phase for a country."""
+    try:
+        agent = DiplomacyAgent(country, use_cheap_model=False)  # Use main model
+        config = load_config()
+        season = get_current_season(config)
+
+        print(f"\nCurrent Season: {season}")
+        print_section_header(f"{country}'s Reflect")
+
+        # Take reflect turn
+        response_text, actions = agent.take_reflect_turn(wipe_void=wipe_void)
+
+        # Show LLM's response
+        print(f"{country} says:")
+        print_divider()
+        print(response_text)
+        print_divider()
+
+        # Execute actions (full file access during reflect)
+        has_actions = actions['files']
+
+        if has_actions:
+            print(f"\nExecuting actions:")
+            agent.execute_actions(actions, season)  # No file restrictions
+            print(f"\n✓ Reflect complete")
+        else:
+            print(f"\nNo file operations this phase.")
+
+        # Wipe void.md if requested
+        if wipe_void:
+            from .utils import get_country_dir
+            void_path = get_country_dir(config, country) / 'void.md'
+            if void_path.exists():
+                void_path.unlink()
+                print(f"  ✓ Cleared void.md")
+
+    except Exception as e:
+        handle_error(e, f"{country}'s reflect")
 
 
 def run_all_turns():
@@ -191,7 +265,11 @@ def collect_orders(turn_order: list = None) -> bool:
 # =============================================================================
 
 def run_gunboat_season():
-    """Run a season in gunboat mode: single turn per country with mandatory orders."""
+    """Run a season in gunboat mode: react phase for all countries.
+
+    Flow:
+    1. REACT (all countries) - cheap_model, void.md + orders.md
+    """
     config = load_config()
     season = get_current_season(config)
     countries = get_all_countries(config)
@@ -200,9 +278,10 @@ def run_gunboat_season():
     print("Mode: Gunboat")
     print(f"Countries: {', '.join(countries)}\n")
 
+    # React phase - each country reacts and submits orders
+    print_section_header("REACT PHASE")
     for country in countries:
-        print(f"--- {country} ---")
-        run_country_turn(country)
+        run_country_react(country)
         print()
 
     print_section_header("SEASON COMPLETE")
@@ -210,7 +289,12 @@ def run_gunboat_season():
 
 
 def run_classic_season():
-    """Run a season in classic mode: multiple rounds with PASS loop."""
+    """Run a season in classic mode: turn rounds + reflect with orders.
+
+    Flow:
+    1. TURN ROUNDS (turn_rounds × all countries) - cheap_model, messages + void.md
+    2. REFLECT (all countries) - main model, full file access + orders.md
+    """
     config = load_config()
     season = get_current_season(config)
     countries = get_all_countries(config)
@@ -225,9 +309,9 @@ def run_classic_season():
     print(f"Turn order: {', '.join(turn_order)}")
 
     turn_rounds = config.get('season', {}).get('turn_rounds', 2)
-    print(f"Turn rounds before orders: {turn_rounds}\n")
+    print(f"Turn rounds: {turn_rounds}\n")
 
-    # Run initial turn rounds
+    # Run turn rounds (messaging + void.md only)
     for round_num in range(1, turn_rounds + 1):
         print_section_header(f"TURN ROUND {round_num}/{turn_rounds}")
 
@@ -235,20 +319,14 @@ def run_classic_season():
             run_country_turn(country)
             print()
 
-    # Orders loop - keep running turns until everyone submits
-    while True:
-        all_submitted = collect_orders(turn_order)
-
-        if all_submitted:
-            break
-        else:
-            print("\nRunning another round of turns...")
-            for country in turn_order:
-                run_country_turn(country)
-                print()
+    # Reflect phase - all countries reflect and submit orders
+    print_section_header("REFLECT PHASE")
+    for country in turn_order:
+        run_country_reflect(country)
+        print()
 
     print_section_header("SEASON COMPLETE")
-    print(f"Season {season} finished. Orders saved to orders.md")
+    print(f"Season {season} finished. Orders in each country's orders.md")
 
 
 def run_season():
@@ -258,3 +336,22 @@ def run_season():
         run_gunboat_season()
     else:
         run_classic_season()
+
+
+def run_all_reflects(wipe_void: bool = False):
+    """Run reflect for all countries.
+
+    Args:
+        wipe_void: If True, clear each country's void.md after reflect
+    """
+    config = load_config()
+    countries = get_all_countries(config)
+    season = get_current_season(config)
+
+    print_section_header(f"REFLECT PHASE: {season}")
+    if wipe_void:
+        print("(void.md will be cleared after each reflect)\n")
+
+    for country in countries:
+        run_country_reflect(country, wipe_void=wipe_void)
+        print()

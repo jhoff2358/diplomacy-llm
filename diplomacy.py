@@ -23,6 +23,8 @@ from src.orchestrator import (
     randomize_order,
     run_all_turns,
     run_country_turn,
+    run_country_reflect,
+    run_all_reflects,
     run_season,
 )
 from src.utils import (
@@ -66,37 +68,12 @@ def run_query(country: str, question: str):
         handle_error(e, f"query to {country}")
 
 
-def run_reflect(country: str):
-    """Run a strategic reflection session for a country."""
-    try:
-        agent = DiplomacyAgent(country)
-        config = load_config()
-        season = get_current_season(config)
+def run_reflect(country: str, wipe_void: bool = False):
+    """Run a strategic reflection session for a country.
 
-        print(f"\nCurrent Season: {season}")
-        print_section_header(f"{country}'s Strategic Reflection")
-
-        # Take reflection turn
-        response_text, actions = agent.take_reflect_turn()
-
-        # Show LLM's response
-        print(f"{country} reflects:")
-        print_divider()
-        print(response_text)
-        print_divider()
-
-        # Execute file actions only (messages during reflection are discouraged but allowed)
-        has_actions = (actions['messages'] or actions['files'])
-
-        if has_actions:
-            print(f"\nExecuting actions:")
-            agent.execute_actions(actions, season)
-            print(f"\n✓ Reflection complete")
-        else:
-            print(f"\nNo file updates during reflection.")
-
-    except Exception as e:
-        handle_error(e, f"{country}'s reflection")
+    Thin wrapper around run_country_reflect for backwards compatibility.
+    """
+    run_country_reflect(country, wipe_void=wipe_void)
 
 
 def overseer():
@@ -238,7 +215,7 @@ def show_help(config: dict):
     print("  randomize           Randomize and save turn order to turn_order.txt")
     print("  all                 Run turns for all countries (from turn_order.txt)")
     print("  <country>           Run a single turn for a country")
-    print("  reflect [country]   Strategic reflection (all countries, or one if specified)")
+    print("  reflect [country] [--all] [--wipe-void]  Strategic reflection")
     print("  query <country> \"question\"  Ask a country a direct question")
     if not gunboat:
         print("  overseer            Analyze conversations for loose ends")
@@ -295,20 +272,36 @@ def main():
         initialize_game(skip_cleanup=skip_cleanup)
 
     elif command == "reflect":
-        if len(sys.argv) >= 3:
-            # Single country reflection
-            country = find_country(sys.argv[2], countries)
+        # Parse flags
+        wipe_void = "--wipe-void" in sys.argv
+        run_all_from = "--all" in sys.argv
+
+        # Get non-flag args
+        args = [a for a in sys.argv[2:] if not a.startswith('--')]
+
+        if args:
+            country_arg = args[0]
+            country = find_country(country_arg, countries)
             if country is None:
-                print(f"Error: '{sys.argv[2]}' is not a recognized country")
+                print(f"Error: '{country_arg}' is not a recognized country")
                 print(f"Countries: {', '.join(countries)}")
                 sys.exit(1)
-            run_reflect(country)
+
+            if run_all_from:
+                # Start from this country and continue through the rest
+                print_section_header("REFLECTION PHASE")
+                if wipe_void:
+                    print("(void.md will be cleared after each reflect)\n")
+                start_index = countries.index(country)
+                for c in countries[start_index:]:
+                    run_reflect(c, wipe_void=wipe_void)
+                    print()
+            else:
+                # Single country reflection
+                run_reflect(country, wipe_void=wipe_void)
         else:
             # All countries reflection
-            print_section_header("REFLECTION PHASE")
-            for country in countries:
-                run_reflect(country)
-                print()
+            run_all_reflects(wipe_void=wipe_void)
 
     elif command == "query":
         if len(sys.argv) < 4:

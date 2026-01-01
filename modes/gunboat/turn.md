@@ -4,10 +4,11 @@
 
 **YOUR TURN**
 
-First, briefly react to what happened last season (or the current board state if this is the start). What surprised you? What went as expected? How does this change your thinking?
+React to recent events. Write your thoughts to void.md - this is your scratchpad.
 
-Then, analyze the board and submit your orders:
-1. Update your notes with your strategic thinking
-2. Write your orders to orders.md (use mode="edit" to replace previous orders)
+{block:file_management}
 
-{block:order_format}
+**RESTRICTIONS:**
+- You can ONLY write to void.md in this phase
+- No orders yet - those come during reflect
+- No messaging (gunboat mode)

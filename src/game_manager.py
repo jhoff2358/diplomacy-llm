@@ -55,14 +55,14 @@ def create_game_state_template(country: str) -> str:
     return f"""Spring 1901
 
 # Current Game State - {country}
+# For all provinces listed in your vision, assume they are empty unless explicitly specified.
 
 ## Permanent Home SC Visibility
-## Supply Centers you control marked with an asterisk. Assume provinces do not contain units unless explicitly specified
 
 ## Additional visibility from units:
 None yet
 
-## Countries You Border (Can Message)
+## Countries you've met
 *To be filled in by game master*
 """
 
@@ -103,17 +103,17 @@ def cleanup():
     else:
         print("- No conversations directory")
 
-    # Clear country folders
-    for country in countries:
-        country_dir = get_country_dir(config, country)
-        if country_dir.exists():
-            count = 0
-            for md_file in country_dir.glob("*.md"):
-                md_file.unlink()
-                count += 1
-            print(f"✓ Removed {count} files from {country}/")
-        else:
-            print(f"- No {country}/ directory")
+    # Clear ALL country folders (not just current config countries)
+    # This handles switching between variants with different country lists
+    import shutil
+    if data_dir.exists():
+        for item in data_dir.iterdir():
+            # Skip conversations dir and shared files, remove all other directories
+            if item.is_dir() and item.name != config['paths']['shared_conversations_dir'].lstrip('_'):
+                shutil.rmtree(item)
+                print(f"✓ Removed {item.name}/ folder")
+    else:
+        print("- No data directory")
 
     # Clear shared files in classic mode
     if not is_fow(config):

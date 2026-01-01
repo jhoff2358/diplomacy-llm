@@ -27,7 +27,7 @@ RESERVED_FILES = {'game_history.md', 'game_state.md'}
 class DiplomacyAgent:
     """Manages a single country's LLM session and actions."""
 
-    def __init__(self, country: str, config_path: str = "config.yaml"):
+    def __init__(self, country: str, config_path: str = "config.yaml", use_cheap_model: bool = False):
         self.country = country
 
         # Load config
@@ -42,7 +42,8 @@ class DiplomacyAgent:
 
         # Configure Gemini
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel(self.config['model'])
+        model_name = self.config.get('cheap_model', self.config['model']) if use_cheap_model else self.config['model']
+        self.model = genai.GenerativeModel(model_name)
         self.chat = None  # Will be initialized when needed
 
         # Context loader
@@ -84,7 +85,7 @@ class DiplomacyAgent:
             "country": self.country
         })
 
-    def initialize_reflect_session(self):
+    def initialize_reflect_session(self, wipe_void: bool = False):
         """Initialize a reflection session focused on strategic thinking."""
         context = self.context_loader.format_context()
         mode_loader = ModeLoader(self.config)
@@ -94,6 +95,21 @@ class DiplomacyAgent:
 
         # Load reflect prompt from mode templates
         return mode_loader.get_prompt("reflect", {
+            "context": context,
+            "country": self.country,
+            "wipe_void": wipe_void
+        })
+
+    def initialize_react_session(self):
+        """Initialize a react session for quick reactions to board state."""
+        context = self.context_loader.format_context()
+        mode_loader = ModeLoader(self.config)
+
+        # Start new chat with full context
+        self.chat = self.model.start_chat(history=[])
+
+        # Load react prompt from mode templates
+        return mode_loader.get_prompt("react", {
             "context": context,
             "country": self.country
         })
@@ -146,15 +162,34 @@ class DiplomacyAgent:
 
         return actions
 
-    def execute_actions(self, actions: Dict[str, Any], season: str = None):
-        """Execute parsed actions."""
+    def execute_actions(self, actions: Dict[str, Any], season: str = None, restrict_files: list = None):
+        """Execute parsed actions.
+
+        Args:
+            actions: Parsed actions dict with 'messages' and 'files' lists
+            season: Current season for message headers
+            restrict_files: If provided, only allow writes to these files (e.g., ['void.md', 'orders.md'])
+        """
         # Send messages
         for msg in actions['messages']:
             self.send_message(msg['to'], msg['content'], season)
 
         # Handle file operations
         for file_op in actions['files']:
-            self.write_file(file_op['name'], file_op['content'], file_op['mode'])
+            filename = file_op['name']
+
+            # Enforce file restriction if specified
+            if restrict_files is not None:
+                # Normalize filename for comparison
+                normalized = filename.lower()
+                if not normalized.endswith('.md'):
+                    normalized += '.md'
+                allowed = [f.lower() for f in restrict_files]
+                if normalized not in allowed:
+                    print(f"  ! Skipped {filename} (only {', '.join(restrict_files)} allowed in this phase)")
+                    continue
+
+            self.write_file(filename, file_op['content'], file_op['mode'])
 
     def take_turn(self, season: str = None) -> Tuple[str, Dict[str, Any]]:
         """Take a turn: show context and get LLM response."""
@@ -172,9 +207,13 @@ class DiplomacyAgent:
 
         return response_text, actions
 
-    def take_reflect_turn(self) -> Tuple[str, Dict[str, Any]]:
-        """Take a reflection turn focused on strategic thinking."""
-        prompt = self.initialize_reflect_session()
+    def take_reflect_turn(self, wipe_void: bool = False) -> Tuple[str, Dict[str, Any]]:
+        """Take a reflection turn focused on strategic thinking.
+
+        Args:
+            wipe_void: If True, tell agent their void.md will be cleared after response
+        """
+        prompt = self.initialize_reflect_session(wipe_void=wipe_void)
 
         # Get response from LLM with retry (includes .text access which can also fail)
         def get_response():
@@ -186,6 +225,25 @@ class DiplomacyAgent:
         # Parse actions but filter out messages (reflection is private)
         actions = self.parse_response(response_text)
         actions['messages'] = []  # No messaging during reflection
+
+        return response_text, actions
+
+    def take_react_turn(self) -> Tuple[str, Dict[str, Any]]:
+        """Take a react turn for quick reactions to board state.
+
+        React turns can only write to void.md and send messages.
+        """
+        prompt = self.initialize_react_session()
+
+        # Get response from LLM with retry
+        def get_response():
+            response = self.chat.send_message(prompt)
+            return response.text
+
+        response_text = self._retry(get_response, f"{self.country} react")
+
+        # Parse actions
+        actions = self.parse_response(response_text)
 
         return response_text, actions
 
@@ -211,14 +269,21 @@ class DiplomacyAgent:
     def write_file(self, filename: str, content: str, mode: str):
         """Write/append/delete a file in the country directory."""
 
-        # Validate filename
+        # Auto-fix filename extension if not .md
         if not filename.endswith('.md'):
-            print(f"  ✗ Invalid filename '{filename}' - must end with .md")
-            return
+            original = filename
+            # Replace existing extension or add .md
+            if '.' in filename:
+                filename = filename.rsplit('.', 1)[0] + '.md'
+            else:
+                filename = filename + '.md'
+            print(f"  ! Renamed '{original}' -> '{filename}'")
 
+        # Redirect reserved filenames to country-specific versions
         if filename in RESERVED_FILES:
-            print(f"  ✗ Cannot modify reserved file '{filename}'")
-            return
+            base = filename.rsplit('.', 1)[0]  # e.g., "game_history"
+            filename = f"{base}_{self.country.lower()}.md"
+            print(f"  ! Reserved filename, redirecting to {filename}")
 
         file_path = self.country_dir / filename
 
@@ -252,6 +317,7 @@ class DiplomacyAgent:
 
         With messaging enabled: Returns orders or "PASS" if more diplomacy time is needed.
         Without messaging: Orders are mandatory, no PASS option.
+        Also processes any file operations in the response.
         """
         context = self.context_loader.format_context()
         mode_loader = ModeLoader(self.config)
@@ -268,7 +334,14 @@ class DiplomacyAgent:
             response = chat.send_message(prompt)
             return response.text
 
-        return self._retry(get_response, f"{self.country} orders")
+        response_text = self._retry(get_response, f"{self.country} orders")
+
+        # Parse and execute any file operations (but not messages during orders phase)
+        actions = self.parse_response(response_text)
+        for file_op in actions['files']:
+            self.write_file(file_op['name'], file_op['content'], file_op['mode'])
+
+        return response_text
 
     def query(self, question: str) -> str:
         """Ask the agent a direct question (meta-communication from GM).
