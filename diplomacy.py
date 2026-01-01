@@ -19,7 +19,6 @@ from dotenv import load_dotenv
 from src.agent import DiplomacyAgent
 from src.game_manager import cleanup, initialize_game, show_status
 from src.orchestrator import (
-    collect_orders,
     randomize_order,
     run_all_turns,
     run_country_turn,
@@ -212,8 +211,7 @@ def show_help(config: dict):
     print(f"Current mode: {mode}")
     print()
     print("Commands:")
-    print("  season              Run a full season (planning + orders)")
-    print("  orders              Collect orders from all countries")
+    print("  season              Run a full season (debrief + turns + reflect)")
     print("  randomize           Randomize and save turn order to turn_order.txt")
     print("  all                 Run turns for all countries (from turn_order.txt)")
     print("  <country>           Run a single turn for a country")
@@ -246,7 +244,6 @@ COMMANDS = {
     'randomize': randomize_order,
     'all': run_all_turns,
     'season': run_season,
-    'orders': collect_orders,
     'overseer': overseer,
     'status': show_status,
     'cleanup': cleanup,

@@ -376,37 +376,6 @@ class DiplomacyAgent:
         else:
             print(f"  ✗ Unknown mode '{mode}' - use append, edit, or delete")
 
-    def get_orders(self) -> str:
-        """Ask the agent for their orders for this phase.
-
-        With messaging enabled: Returns orders or "PASS" if more diplomacy time is needed.
-        Without messaging: Orders are mandatory, no PASS option.
-        Also processes any file operations in the response.
-        """
-        context = self.context_loader.format_context()
-        mode_loader = ModeLoader(self.config)
-
-        chat = self.model.start_chat(history=[])
-
-        # Load orders prompt from mode templates
-        prompt = mode_loader.get_prompt("orders", {
-            "context": context,
-            "country": self.country
-        })
-
-        def get_response():
-            response = chat.send_message(prompt)
-            return response.text
-
-        response_text = self._retry(get_response, f"{self.country} orders")
-
-        # Parse and execute any file operations (but not messages during orders phase)
-        actions = self.parse_response(response_text)
-        for file_op in actions['files']:
-            self.write_file(file_op['name'], file_op['content'], file_op['mode'])
-
-        return response_text
-
     def query(self, question: str) -> str:
         """Ask the agent a direct question (meta-communication from GM).
 

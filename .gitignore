@@ -30,6 +30,12 @@ countries*/
 orders.md
 turn_order.txt
 
+# Local helper scripts
+formatter.py
+setup/
+
+# Work-in-progress modes
+modes/*_wip/
+
 # Claude Code
 .claude/
-turn_order.txt
