@@ -351,14 +351,12 @@ def run_country_debrief(country: str):
         print(response_text)
         print_divider()
 
-        # Execute actions (lessons_learned.md and void.md)
+        # Execute actions (any file, but append-only)
         has_actions = actions['files']
 
         if has_actions:
             print(f"\nExecuting actions:")
-            agent.execute_actions(actions, season,
-                                  restrict_files=['lessons_learned.md', 'void.md'],
-                                  append_only_files=['lessons_learned.md', 'void.md'])
+            agent.execute_actions(actions, season, append_only_files=True)
             print(f"\n✓ Debrief complete")
         else:
             print(f"\nNo actions this phase.")

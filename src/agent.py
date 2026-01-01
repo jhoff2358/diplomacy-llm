@@ -122,10 +122,16 @@ class DiplomacyAgent:
         # Start new chat with full context
         self.chat = self.model.start_chat(history=[])
 
+        # Check if this is the first season (Spring 1901)
+        season = self.config.get('game', {}).get('current_season', '')
+        is_first = season.lower().strip() == 'spring 1901'
+
         # Load debrief prompt from mode templates
         return mode_loader.get_prompt("debrief", {
             "context": context,
-            "country": self.country
+            "country": self.country,
+            "first_season": is_first,
+            "not_first_season": not is_first
         })
 
     def parse_response(self, response_text: str) -> Dict[str, Any]:
@@ -188,14 +194,15 @@ class DiplomacyAgent:
         return actions
 
     def execute_actions(self, actions: Dict[str, Any], season: str = None,
-                        restrict_files: list = None, append_only_files: list = None):
+                        restrict_files: list = None, append_only_files = None):
         """Execute parsed actions.
 
         Args:
             actions: Parsed actions dict with 'messages' and 'files' lists
             season: Current season for message headers
             restrict_files: If provided, only allow writes to these files (e.g., ['void.md', 'orders.md'])
-            append_only_files: If provided, force append mode for these files (e.g., ['void.md'])
+            append_only_files: If True, force append mode for all files.
+                               If a list, force append mode for those files (e.g., ['void.md'])
         """
         # Send messages
         for msg in actions['messages']:
@@ -218,8 +225,12 @@ class DiplomacyAgent:
                     print(f"  ! Skipped {filename} (only {', '.join(restrict_files)} allowed in this phase)")
                     continue
 
-            # Enforce append-only for specified files
-            if append_only_files is not None:
+            # Enforce append-only for specified files (or all files if True)
+            if append_only_files is True:
+                if mode != 'append':
+                    print(f"  ! Forcing append mode for {filename} (append-only phase)")
+                    mode = 'append'
+            elif append_only_files is not None:
                 append_only = [f.lower() for f in append_only_files]
                 if normalized in append_only and mode != 'append':
                     print(f"  ! Forcing append mode for {filename} (append-only in this phase)")
@@ -284,9 +295,9 @@ class DiplomacyAgent:
         return response_text, actions
 
     def take_debrief_turn(self) -> Tuple[str, Dict[str, Any]]:
-        """Take a debrief turn to learn from results and plan the season.
+        """Take a debrief turn to learn from last season.
 
-        Debrief turns can write to lessons_learned.md and void.md.
+        Debrief turns can write to any file, but all writes are append-only.
         """
         prompt = self.initialize_debrief_session()
 
