@@ -114,6 +114,20 @@ class DiplomacyAgent:
             "country": self.country
         })
 
+    def initialize_debrief_session(self):
+        """Initialize a debrief session for learning from results and planning the season."""
+        context = self.context_loader.format_context()
+        mode_loader = ModeLoader(self.config)
+
+        # Start new chat with full context
+        self.chat = self.model.start_chat(history=[])
+
+        # Load debrief prompt from mode templates
+        return mode_loader.get_prompt("debrief", {
+            "context": context,
+            "country": self.country
+        })
+
     def parse_response(self, response_text: str) -> Dict[str, Any]:
         """Parse XML-style tags from LLM response.
 
@@ -266,6 +280,26 @@ class DiplomacyAgent:
 
         # Parse actions
         actions = self.parse_response(response_text)
+
+        return response_text, actions
+
+    def take_debrief_turn(self) -> Tuple[str, Dict[str, Any]]:
+        """Take a debrief turn to learn from results and plan the season.
+
+        Debrief turns can write to lessons_learned.md and void.md.
+        """
+        prompt = self.initialize_debrief_session()
+
+        # Get response from LLM with retry
+        def get_response():
+            response = self.chat.send_message(prompt)
+            return response.text
+
+        response_text = self._retry(get_response, f"{self.country} debrief")
+
+        # Parse actions but filter out messages (debrief is private)
+        actions = self.parse_response(response_text)
+        actions['messages'] = []  # No messaging during debrief
 
         return response_text, actions
 

@@ -25,6 +25,8 @@ from src.orchestrator import (
     run_country_turn,
     run_country_reflect,
     run_all_reflects,
+    run_country_debrief,
+    run_all_debriefs,
     run_season,
 )
 from src.utils import (
@@ -216,6 +218,7 @@ def show_help(config: dict):
     print("  all                 Run turns for all countries (from turn_order.txt)")
     print("  <country>           Run a single turn for a country")
     print("  reflect [country] [--all] [--wipe-void]  Strategic reflection")
+    print("  debrief [country]   Learn from results and plan the season")
     print("  query <country> \"question\"  Ask a country a direct question")
     if not gunboat:
         print("  overseer            Analyze conversations for loose ends")
@@ -302,6 +305,22 @@ def main():
         else:
             # All countries reflection
             run_all_reflects(wipe_void=wipe_void)
+
+    elif command == "debrief":
+        # Get non-flag args
+        args = [a for a in sys.argv[2:] if not a.startswith('--')]
+
+        if args:
+            country_arg = args[0]
+            country = find_country(country_arg, countries)
+            if country is None:
+                print(f"Error: '{country_arg}' is not a recognized country")
+                print(f"Countries: {', '.join(countries)}")
+                sys.exit(1)
+            run_country_debrief(country)
+        else:
+            # All countries debrief
+            run_all_debriefs()
 
     elif command == "query":
         if len(sys.argv) < 4:

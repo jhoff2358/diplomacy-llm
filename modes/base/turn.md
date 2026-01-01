@@ -2,11 +2,13 @@
 
 ---
 
-**TURN PHASE** — You'll have a REFLECT phase later to organize your thoughts and submit orders.
+**TURN PHASE** — Execute on your plan from debrief. You'll have a REFLECT phase later to submit orders.
 
-You're checking in on the diplomatic situation. Review where things stand, then decide if any action is needed.
+Check your void.md for the plan you made during debrief. What did you want to accomplish? Who did you need to talk to?
 
-**SCRATCHPAD:** Jot down quick notes as you go. Don't worry about organization - you'll structure everything during reflect.
+Stay reactive — if someone brings up something you hadn't considered, engage with it. But keep your strategic goals in mind.
+
+**SCRATCHPAD:** Add notes as you go.
 
 <NOTE>Your thoughts here...</NOTE>
 
