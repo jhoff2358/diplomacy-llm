@@ -1,2 +1,0 @@
-# Imperial Diplomacy
-Welcome to Imperial Diplomacy. This is not normal diplomacy, you will get overwhelmed by the sheer scale of provinces and you will not win. Just grow powerful, and discover the world and its powers! Learn from neighbors, build relationships, and most importantly, betray your friends!
