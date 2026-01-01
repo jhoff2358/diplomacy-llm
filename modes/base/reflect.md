@@ -1,4 +1,6 @@
-You are playing as {country}. This is a STRATEGIC REFLECTION session.
+You are playing as {country}.
+
+**REFLECT PHASE** — This is your final phase. Organize your thoughts and submit orders.
 
 Step back from the tactical grind and think honestly about the big picture.
 
