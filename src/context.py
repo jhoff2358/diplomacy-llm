@@ -128,18 +128,11 @@ class ContextLoader:
         # Build context from mode templates
         header = mode_loader.get_prompt("context_header", {"country": self.country})
         rules = mode_loader.get_prompt("rules")
-        file_mgmt = mode_loader.get_prompt("file_management")
 
         context = f"{header}\n"
 
         if rules:
             context += f"\n{rules}\n"
-
-        context += f"\n{file_mgmt}\n"
-
-        if mode_loader.is_feature_enabled("messaging_instructions"):
-            messaging = mode_loader.get_prompt("messaging_instructions")
-            context += f"\n{messaging}\n"
 
         # Add game data sections
         context += f"""
