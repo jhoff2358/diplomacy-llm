@@ -16,4 +16,4 @@ React to recent events. Send messages to other powers if needed.
 - You can ONLY append to void.md in this phase (messages are separate)
 - No orders yet - those come during reflect
 
-If you have nothing to add right now, simply respond with **PASS**.
+If you have nothing to add this round (no notes, no messages), simply respond with **DONE** to end your turn early.
