@@ -67,7 +67,7 @@ research/
 ├── hypotheses/
 │   └── interventions.md              # Proposed experiments to test
 └── data/
-    ├── game-001-summary.md           # 12-year gunboat game (2024)
+    ├── game-001-summary.md           # 12-year gunboat game (Dec 2025)
     └── game-002-summary.md           # PLAN experiment game (Jan 2026)
 ```
 
