@@ -21,7 +21,7 @@ Each country is controlled by a separate LLM session. The LLMs:
 **You** manually:
 - Adjudicate moves on a Diplomacy board
 - Update `game_history.md` with results
-- Advance the season in `config.yaml`
+- Update `game_state.md` with the new season and board state
 
 ## Research
 
@@ -61,7 +61,7 @@ PLAN → TURN (x N rounds) → REFLECT
 
 ```
 diplomacy-llm/
-├── config.yaml          # Game settings (season, models, features)
+├── config.yaml          # Game settings (models, features)
 ├── diplomacy.py         # CLI entry point
 ├── src/                 # Python modules
 │   ├── agent.py         # LLM interaction
@@ -73,6 +73,8 @@ diplomacy-llm/
 │   ├── gunboat/         # No-messaging variant
 │   └── fow/             # Fog of war variant
 └── countries/           # Generated at runtime
+    ├── game_state.md        # Current season and board state (you update this)
+    ├── game_history.md      # Move history (you update this)
     ├── France/
     │   ├── void.md              # Scratchpad
     │   ├── orders.md            # Current orders
@@ -100,22 +102,23 @@ features:
 ## Typical Workflow
 
 ```bash
-# 1. Update config.yaml with new season
-# 2. Update game_history.md with adjudication results
+# 1. Run the season
+python diplomacy.py season
 
-python diplomacy.py season    # Run full season
-
-# 3. Review orders in each country's orders.md
-# 4. Adjudicate on your board
-# 5. Repeat!
+# 2. Review orders in each country's orders.md
+# 3. Adjudicate on your board
+# 4. Update game_history.md with results
+# 5. Update game_state.md with new season and board state
+# 6. Repeat!
 ```
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `config.yaml` | Game settings, current season, model selection |
-| `countries/*/game_history.md` | Board state and move history (you update this) |
+| `config.yaml` | Game settings, model selection, features |
+| `countries/game_state.md` | Current season and board state (you update this) |
+| `countries/game_history.md` | Move history (you update this) |
 | `countries/*/void.md` | Country's scratchpad (cleared periodically) |
 | `countries/*/lessons_learned.md` | Accumulated lessons from past mistakes |
 | `countries/*/orders.md` | Current season's orders |
@@ -125,10 +128,7 @@ python diplomacy.py season    # Run full season
 ```yaml
 # config.yaml
 model: gemini-3-flash-preview      # Main model for reflect phase
-cheap_model: gemini-3-flash-preview  # Fast model for debrief/turn
-
-game:
-  current_season: Spring 1901
+cheap_model: gemini-3-flash-preview  # Fast model for plan/turn
 
 season:
   turn_rounds: 3  # Messaging rounds per season
@@ -136,6 +136,8 @@ season:
 features:
   gunboat: false  # Set true for no-messaging mode
 ```
+
+Game state (season, units, supply centers) is stored in `countries/game_state.md`, not in config.
 
 ## For Developers
 

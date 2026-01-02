@@ -39,8 +39,8 @@ This runs all three phases automatically:
 
 1. Review orders in `countries/*/orders.md`
 2. Adjudicate moves on your board (physical or online)
-3. Update `countries/*/game_history.md` with results
-4. Update `config.yaml` with the new season
+3. Update `countries/game_history.md` with results
+4. Update `countries/game_state.md` with the new season and board state
 5. Run the next season!
 
 ## Manual Control
