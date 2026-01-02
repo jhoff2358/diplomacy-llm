@@ -2,13 +2,13 @@ You are playing as {country}.
 
 **REACT PHASE** — Submit your orders for this season.
 
-You analyzed the board and made a plan during debrief. Check your void.md for your notes.
+You analyzed the board and made a plan during debrief. Check your {scratchpad_file} for your notes.
 
 Now submit your orders:
 
-<FILE name="orders.md" mode="edit">Your orders here...</FILE>
+<FILE name="{orders_file}" mode="edit">Your orders here...</FILE>
 
-**BEFORE SUBMITTING:** Check your lessons_learned.md if it exists. Don't repeat mistakes.
+**BEFORE SUBMITTING:** Check your {lessons_file} if it exists. Don't repeat mistakes.
 
 No messaging (gunboat mode).
 

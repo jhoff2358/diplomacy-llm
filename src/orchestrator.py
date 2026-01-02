@@ -4,6 +4,7 @@ Handles season execution, turn order management, and order collection.
 """
 
 import random
+import shutil
 from pathlib import Path
 
 from .agent import DiplomacyAgent
@@ -42,11 +43,12 @@ def add_season_headers():
             with open(conv_file, 'a') as f:
                 f.write(header)
 
-    # Add headers to all void files
+    # Add headers to all scratchpad files
     from .utils import get_country_dir
+    scratchpad_file = config['paths']['scratchpad']
     for country in countries:
-        void_path = get_country_dir(config, country) / 'void.md'
-        with open(void_path, 'a') as f:
+        scratchpad_path = get_country_dir(config, country) / scratchpad_file
+        with open(scratchpad_path, 'a') as f:
             f.write(header)
 
     print(f"✓ Added season headers ({season}) to conversations and void files")
@@ -106,14 +108,15 @@ def run_country_turn(country: str, use_cheap_model: bool = True):
         print(response_text)
         print_divider()
 
-        # Execute actions if any were parsed (void.md only, append-only)
+        # Execute actions if any were parsed (scratchpad only, append-only)
         has_actions = (actions['messages'] or actions['files'])
+        scratchpad = config['paths']['scratchpad']
 
         if has_actions:
             print(f"\nExecuting actions:")
             agent.execute_actions(actions, season,
-                                  restrict_files=['void.md'],
-                                  append_only_files=['void.md'])
+                                  restrict_files=[scratchpad],
+                                  append_only_files=[scratchpad])
             print(f"\n✓ Turn complete")
         else:
             print(f"\nNo actions taken this turn.")
@@ -123,11 +126,13 @@ def run_country_turn(country: str, use_cheap_model: bool = True):
 
 
 def run_country_react(country: str):
-    """Run a react phase for a country (gunboat mode - void.md + orders)."""
+    """Run a react phase for a country (gunboat mode - scratchpad + orders)."""
     try:
         agent = DiplomacyAgent(country, use_cheap_model=True)
         config = load_config()
         season = get_current_season(config)
+        scratchpad = config['paths']['scratchpad']
+        orders_file = config['paths']['orders']
 
         print(f"\nCurrent Season: {season}")
         print_section_header(f"{country}'s React")
@@ -141,14 +146,14 @@ def run_country_react(country: str):
         print(response_text)
         print_divider()
 
-        # Execute actions (void.md append-only, orders.md full access)
+        # Execute actions (scratchpad append-only, orders full access)
         has_actions = (actions['messages'] or actions['files'])
 
         if has_actions:
             print(f"\nExecuting actions:")
             agent.execute_actions(actions, season,
-                                  restrict_files=['void.md', 'orders.md'],
-                                  append_only_files=['void.md'])
+                                  restrict_files=[scratchpad, orders_file],
+                                  append_only_files=[scratchpad])
             print(f"\n✓ React complete")
         else:
             print(f"\nNo actions taken this phase.")
@@ -186,13 +191,14 @@ def run_country_reflect(country: str, wipe_void: bool = False):
         else:
             print(f"\nNo file operations this phase.")
 
-        # Wipe void.md if requested
+        # Wipe scratchpad if requested
         if wipe_void:
             from .utils import get_country_dir
-            void_path = get_country_dir(config, country) / 'void.md'
-            if void_path.exists():
-                void_path.unlink()
-                print(f"  ✓ Cleared void.md")
+            scratchpad = config['paths']['scratchpad']
+            scratchpad_path = get_country_dir(config, country) / scratchpad
+            if scratchpad_path.exists():
+                scratchpad_path.unlink()
+                print(f"  ✓ Cleared {scratchpad}")
 
     except Exception as e:
         handle_error(e, f"{country}'s reflect")
@@ -300,8 +306,27 @@ def run_classic_season():
     print(f"Season {season} finished. Orders in each country's orders.md")
 
 
+def backup_countries():
+    """Backup countries folder before running a season."""
+    config = load_config()
+    data_dir = Path(config.get('paths', {}).get('data_dir', 'countries'))
+    backup_dir = Path('countries_backup')
+
+    # Remove old backup if it exists
+    if backup_dir.exists():
+        shutil.rmtree(backup_dir)
+        print(f"Removed old backup: {backup_dir}")
+
+    # Copy countries to backup
+    shutil.copytree(data_dir, backup_dir)
+    print(f"Backed up {data_dir} to {backup_dir}\n")
+
+
 def run_season():
     """Run a full season based on the current game mode."""
+    # Backup countries folder first
+    backup_countries()
+
     config = load_config()
     if is_gunboat(config):
         run_gunboat_season()

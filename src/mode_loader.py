@@ -102,14 +102,19 @@ class ModeLoader:
         # Resolve block references: {block:name}
         result = self._resolve_blocks(result)
 
-        # Process conditionals: {if:var}...{endif}
-        if variables:
-            result = self._process_conditionals(result, variables)
+        # Inject filename variables from config (always available)
+        if variables is None:
+            variables = {}
+        variables.setdefault('scratchpad_file', self.config['paths']['scratchpad'])
+        variables.setdefault('orders_file', self.config['paths']['orders'])
+        variables.setdefault('lessons_file', self.config['paths']['lessons'])
 
-        # Substitute variables if provided
-        if variables:
-            for key, value in variables.items():
-                result = result.replace(f"{{{key}}}", str(value))
+        # Process conditionals: {if:var}...{endif}
+        result = self._process_conditionals(result, variables)
+
+        # Substitute variables
+        for key, value in variables.items():
+            result = result.replace(f"{{{key}}}", str(value))
 
         return result
 

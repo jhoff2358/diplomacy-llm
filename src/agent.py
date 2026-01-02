@@ -166,13 +166,14 @@ class DiplomacyAgent:
                     'content': message_content
                 })
 
-        # Parse NOTE tags (simple scratchpad notes -> void.md append)
+        # Parse NOTE tags (simple scratchpad notes -> scratchpad file append)
         note_pattern = r'<NOTE>(.*?)</NOTE>'
+        scratchpad_file = self.config['paths']['scratchpad']
         for match in re.finditer(note_pattern, response_text, re.DOTALL | re.IGNORECASE):
             content = match.group(1).strip()
             if content:
                 actions['files'].append({
-                    'name': 'void.md',
+                    'name': scratchpad_file,
                     'mode': 'append',
                     'content': content
                 })

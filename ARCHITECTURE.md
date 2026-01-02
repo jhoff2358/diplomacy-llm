@@ -167,19 +167,17 @@ modes/gunboat/messaging_instructions.md.disable
 
 These are identified improvements not yet implemented.
 
-### Move Hardcoded Filenames to Config
+### ~~Move Hardcoded Filenames to Config~~ ✓ DONE
 
-**Problem:** `void.md`, `lessons_learned.md`, `orders.md` are hardcoded in Python.
-
-**Solution:**
+Filenames are now configurable in `config.yaml` under `paths:`:
 ```yaml
-file_names:
+paths:
   scratchpad: void.md
-  lessons: lessons_learned.md
   orders: orders.md
+  lessons: lessons_learned.md
 ```
 
-**Files affected:** orchestrator.py, agent.py, context.py, prompts
+Prompt templates use `{scratchpad_file}`, `{orders_file}`, `{lessons_file}` variables.
 
 ### Phase Configuration in Config
 

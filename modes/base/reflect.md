@@ -8,7 +8,7 @@ Organize your files however you like:
 <FILE name="<filename>.md" mode="edit">...</FILE>
 
 Submit your orders:
-<FILE name="orders.md" mode="edit">...</FILE>
+<FILE name="{orders_file}" mode="edit">...</FILE>
 
 {block:order_format}
 
@@ -17,5 +17,5 @@ Submit your orders:
 {context}
 
 {if:wipe_void}
-**NOTE:** Your void.md will be cleared after this. Save anything important to other files.
+**NOTE:** Your {scratchpad_file} will be cleared after this. Save anything important to other files.
 {endif}

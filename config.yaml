@@ -3,7 +3,7 @@
 # Feature flags
 features:
   fog_of_war: false
-  gunboat: true
+  gunboat: false
   chess: false
 
 # Countries in the game
@@ -18,8 +18,8 @@ countries:
 
 # Gemini models to use
 # model: gemini-3-pro-preview  # Main model for turns
-model: gemini-3-pro-preview  # Main model for turns
-cheap_model: gemini-3-pro-preview  # Cheap model for readiness/orders
+model: gemini-3-flash-preview  # Main model for turns
+cheap_model: gemini-3-flash-preview  # Cheap model for readiness/orders
 
 # Game settings
 game:
@@ -29,9 +29,13 @@ game:
 paths:
   data_dir: countries  # All game data (country folders, conversations, shared files)
   shared_conversations_dir: _conversations  # Relative to data_dir (underscore keeps it sorted first)
-  # Per-country files (relative to country directory)
+  # Shared files (relative to data_dir)
   game_history: game_history.md
   game_state: game_state.md
+  # Per-country files (relative to country directory)
+  scratchpad: void.md
+  orders: orders.md
+  lessons: lessons_learned.md
 
 # Context settings
 context:
@@ -43,4 +47,4 @@ api:
 
 # Season settings
 season:
-  turn_rounds: 2  # Number of turn rounds before checking readiness
+  turn_rounds: 3  # Number of turn rounds before checking readiness
