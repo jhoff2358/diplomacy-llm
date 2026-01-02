@@ -114,8 +114,8 @@ class DiplomacyAgent:
             "country": self.country
         })
 
-    def initialize_debrief_session(self):
-        """Initialize a debrief session for learning from results and planning the season."""
+    def initialize_plan_session(self):
+        """Initialize a plan session for considering options before diplomacy."""
         context = self.context_loader.format_context()
         mode_loader = ModeLoader(self.config)
 
@@ -126,8 +126,8 @@ class DiplomacyAgent:
         season = self.config.get('game', {}).get('current_season', '')
         is_first = season.lower().strip() == 'spring 1901'
 
-        # Load debrief prompt from mode templates
-        return mode_loader.get_prompt("debrief", {
+        # Load plan prompt from mode templates
+        return mode_loader.get_prompt("plan", {
             "context": context,
             "country": self.country,
             "first_season": is_first,
@@ -294,23 +294,23 @@ class DiplomacyAgent:
 
         return response_text, actions
 
-    def take_debrief_turn(self) -> Tuple[str, Dict[str, Any]]:
-        """Take a debrief turn to learn from last season.
+    def take_plan_turn(self) -> Tuple[str, Dict[str, Any]]:
+        """Take a plan turn to consider options before diplomacy.
 
-        Debrief turns can write to any file, but all writes are append-only.
+        Plan turns can write to any file. No messaging (private phase).
         """
-        prompt = self.initialize_debrief_session()
+        prompt = self.initialize_plan_session()
 
         # Get response from LLM with retry
         def get_response():
             response = self.chat.send_message(prompt)
             return response.text
 
-        response_text = self._retry(get_response, f"{self.country} debrief")
+        response_text = self._retry(get_response, f"{self.country} plan")
 
-        # Parse actions but filter out messages (debrief is private)
+        # Parse actions but filter out messages (plan is private)
         actions = self.parse_response(response_text)
-        actions['messages'] = []  # No messaging during debrief
+        actions['messages'] = []  # No messaging during plan
 
         return response_text, actions
 
@@ -362,6 +362,19 @@ class DiplomacyAgent:
 
         file_path = self.country_dir / filename
 
+        # Normalize mode variants to standard modes
+        mode_lower = mode.lower()
+        if mode_lower in ('write', 'overwrite', 'replace', 'create'):
+            mode = 'edit'
+        elif mode_lower in ('add',):
+            mode = 'append'
+        elif mode_lower in ('remove',):
+            mode = 'delete'
+        elif mode_lower not in ('edit', 'append', 'delete'):
+            # Unknown mode - default to edit
+            print(f"  ! Unknown mode '{mode}', defaulting to edit")
+            mode = 'edit'
+
         if mode == 'delete':
             if file_path.exists():
                 file_path.unlink()
@@ -383,9 +396,6 @@ class DiplomacyAgent:
             else:
                 file_path.write_text(content + '\n')
             print(f"  ✓ Appended to {filename}")
-
-        else:
-            print(f"  ✗ Unknown mode '{mode}' - use append, edit, or delete")
 
     def query(self, question: str) -> str:
         """Ask the agent a direct question (meta-communication from GM).

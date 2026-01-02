@@ -24,8 +24,8 @@ from src.orchestrator import (
     run_country_turn,
     run_country_reflect,
     run_all_reflects,
-    run_country_debrief,
-    run_all_debriefs,
+    run_country_plan,
+    run_all_plans,
     run_season,
 )
 from src.utils import (
@@ -211,12 +211,12 @@ def show_help(config: dict):
     print(f"Current mode: {mode}")
     print()
     print("Commands:")
-    print("  season              Run a full season (debrief + turns + reflect)")
+    print("  season              Run a full season (plan + turns + reflect)")
     print("  randomize           Randomize and save turn order to turn_order.txt")
     print("  all                 Run turns for all countries (from turn_order.txt)")
     print("  <country>           Run a single turn for a country")
     print("  reflect [country] [--all] [--wipe-void]  Strategic reflection")
-    print("  debrief [country]   Learn from results and plan the season")
+    print("  plan [country]      Consider options before diplomacy")
     print("  query <country> \"question\"  Ask a country a direct question")
     if not gunboat:
         print("  overseer            Analyze conversations for loose ends")
@@ -303,7 +303,7 @@ def main():
             # All countries reflection
             run_all_reflects(wipe_void=wipe_void)
 
-    elif command == "debrief":
+    elif command == "plan":
         # Get non-flag args
         args = [a for a in sys.argv[2:] if not a.startswith('--')]
 
@@ -314,10 +314,10 @@ def main():
                 print(f"Error: '{country_arg}' is not a recognized country")
                 print(f"Countries: {', '.join(countries)}")
                 sys.exit(1)
-            run_country_debrief(country)
+            run_country_plan(country)
         else:
-            # All countries debrief
-            run_all_debriefs()
+            # All countries plan
+            run_all_plans()
 
     elif command == "query":
         if len(sys.argv) < 4:

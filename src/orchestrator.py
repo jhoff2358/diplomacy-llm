@@ -216,10 +216,10 @@ def run_all_turns():
 # =============================================================================
 
 def run_gunboat_season():
-    """Run a season in gunboat mode: debrief then react phase.
+    """Run a season in gunboat mode: plan then react phase.
 
     Flow:
-    1. DEBRIEF (all countries) - cheap_model, learn + plan
+    1. PLAN (all countries) - cheap_model, consider options
     2. REACT (all countries) - cheap_model, void.md + orders.md
     """
     config = load_config()
@@ -233,10 +233,10 @@ def run_gunboat_season():
     # Add season headers to void files (no conversations in gunboat mode)
     add_season_headers()
 
-    # Debrief phase - learn from last season and plan
-    print_section_header("DEBRIEF PHASE")
+    # Plan phase - consider options before diplomacy
+    print_section_header("PLAN PHASE")
     for country in countries:
-        run_country_debrief(country)
+        run_country_plan(country)
         print()
 
     # React phase - each country submits orders
@@ -250,10 +250,10 @@ def run_gunboat_season():
 
 
 def run_classic_season():
-    """Run a season in classic mode: debrief, turn rounds, then reflect with orders.
+    """Run a season in classic mode: plan, turn rounds, then reflect with orders.
 
     Flow:
-    1. DEBRIEF (all countries) - cheap_model, learn + plan
+    1. PLAN (all countries) - cheap_model, consider options
     2. TURN ROUNDS (turn_rounds × all countries) - cheap_model, messages + void.md
     3. REFLECT (all countries) - main model, full file access + orders.md
     """
@@ -276,10 +276,10 @@ def run_classic_season():
     # Add season headers to conversations and void files
     add_season_headers()
 
-    # Debrief phase - learn from last season and plan
-    print_section_header("DEBRIEF PHASE")
+    # Plan phase - consider options before diplomacy
+    print_section_header("PLAN PHASE")
     for country in turn_order:
-        run_country_debrief(country)
+        run_country_plan(country)
         print()
 
     # Run turn rounds (messaging + void.md only)
@@ -329,21 +329,21 @@ def run_all_reflects(wipe_void: bool = False):
 
 
 # =============================================================================
-# Debrief Phase (Learn + Plan)
+# Plan Phase (Consider Options Before Diplomacy)
 # =============================================================================
 
-def run_country_debrief(country: str):
-    """Run a debrief phase for a country to learn from results and plan the season."""
+def run_country_plan(country: str):
+    """Run a plan phase for a country to consider options before diplomacy."""
     try:
         agent = DiplomacyAgent(country, use_cheap_model=True)  # Use cheap model
         config = load_config()
         season = get_current_season(config)
 
         print(f"\nCurrent Season: {season}")
-        print_section_header(f"{country}'s Debrief")
+        print_section_header(f"{country}'s Plan")
 
-        # Take debrief turn
-        response_text, actions = agent.take_debrief_turn()
+        # Take plan turn
+        response_text, actions = agent.take_plan_turn()
 
         # Show LLM's response
         print(f"{country} says:")
@@ -351,29 +351,29 @@ def run_country_debrief(country: str):
         print(response_text)
         print_divider()
 
-        # Execute actions (any file, but append-only)
+        # Execute actions (any file, no restrictions)
         has_actions = actions['files']
 
         if has_actions:
             print(f"\nExecuting actions:")
-            agent.execute_actions(actions, season, append_only_files=True)
-            print(f"\n✓ Debrief complete")
+            agent.execute_actions(actions, season)
+            print(f"\n✓ Plan complete")
         else:
             print(f"\nNo actions this phase.")
 
     except Exception as e:
-        handle_error(e, f"{country}'s debrief")
+        handle_error(e, f"{country}'s plan")
 
 
-def run_all_debriefs():
-    """Run debrief phase for all countries to learn and plan."""
+def run_all_plans():
+    """Run plan phase for all countries to consider options."""
     config = load_config()
     countries = get_all_countries(config)
     season = get_current_season(config)
 
-    print_section_header(f"DEBRIEF PHASE: {season}")
-    print("Learning from results and planning the season...\n")
+    print_section_header(f"PLAN PHASE: {season}")
+    print("Considering options before diplomacy...\n")
 
     for country in countries:
-        run_country_debrief(country)
+        run_country_plan(country)
         print()
