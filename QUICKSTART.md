@@ -31,7 +31,7 @@ python diplomacy.py season
 
 This runs all three phases automatically:
 
-1. **DEBRIEF** - Each country reviews last season, extracts lessons, plans messaging
+1. **PLAN** - Each country considers strategic options and plans messaging
 2. **TURN** (multiple rounds) - Countries exchange messages, react to others
 3. **REFLECT** - Countries organize notes and submit orders
 
@@ -48,8 +48,8 @@ This runs all three phases automatically:
 Instead of `season`, run phases individually:
 
 ```bash
-# Debrief phase (all countries)
-python diplomacy.py debrief
+# Plan phase (all countries)
+python diplomacy.py plan
 
 # Individual turns
 python diplomacy.py france
@@ -66,8 +66,8 @@ python diplomacy.py reflect
 
 | Command | Description |
 |---------|-------------|
-| `season` | Run full season (debrief + turns + reflect) |
-| `debrief [country]` | Learn from results, plan the season |
+| `season` | Run full season (plan + turns + reflect) |
+| `plan [country]` | Consider strategic options, plan the season |
 | `<country>` | Run a single turn |
 | `all` | Run turns for all countries |
 | `reflect [country]` | Organize notes, submit orders |

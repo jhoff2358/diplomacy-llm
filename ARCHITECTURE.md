@@ -4,24 +4,25 @@ A guide for contributors and future Claude sessions working on this codebase.
 
 ## Project Goals
 
-1. **LLMs that learn from experience** - Agents accumulate lessons in `lessons_learned.md` and avoid repeating mistakes
-2. **Purposeful messaging** - Agents plan before they talk (debrief phase), not just react
-3. **Flexible prompt system** - Easy to iterate on prompts without touching Python code
-4. **Mode variants** - Support gunboat (no messaging), fog of war, and other rule variants
+1. **Research testbed** - Study how LLMs reason about strategy, deception, and spatial problems
+2. **LLMs that learn from experience** - Agents accumulate lessons in `lessons_learned.md` and avoid repeating mistakes
+3. **Purposeful messaging** - Agents plan before they talk (plan phase), not just react
+4. **Flexible prompt system** - Easy to iterate on prompts without touching Python code
+5. **Mode variants** - Support gunboat (no messaging), fog of war, and other rule variants
 
 ## Season Flow
 
 Each season runs through three phases:
 
 ```
-DEBRIEF → TURN (x N rounds) → REFLECT
+PLAN → TURN (x N rounds) → REFLECT
 ```
 
-### 1. DEBRIEF (start of season)
+### 1. PLAN (start of season)
 - **Model:** cheap_model
-- **Purpose:** Learn from last season, plan messaging strategy
+- **Purpose:** Consider strategic options, plan messaging strategy
 - **File access:** lessons_learned.md, void.md only (append-only)
-- **Output:** Lessons extracted, messaging plan in void.md
+- **Output:** Strategic plan in void.md
 
 ### 2. TURN (multiple rounds)
 - **Model:** cheap_model
@@ -86,7 +87,7 @@ modes/
 ├── base/           # Always loaded first
 │   ├── turn.md
 │   ├── reflect.md
-│   ├── debrief.md
+│   ├── plan.md
 │   └── ...
 ├── gunboat/        # Loaded if features.gunboat = true
 │   ├── reflect.md  # Overrides base/reflect.md
@@ -99,7 +100,7 @@ modes/
 ### Prompt Types
 
 **Override prompts** (last mode wins):
-- turn.md, reflect.md, debrief.md, context_header.md
+- turn.md, reflect.md, plan.md, context_header.md
 
 **Concatenated prompts** (all modes combined):
 - rules.md, file_management.md, order_format.md
@@ -187,8 +188,8 @@ file_names:
 **Solution:**
 ```yaml
 phases:
-  debrief:
-    prompt: debrief
+  plan:
+    prompt: plan
     model: cheap_model
     allow_messages: false
     restrict_files: [lessons_learned.md, void.md]

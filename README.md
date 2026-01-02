@@ -1,6 +1,6 @@
 # Diplomacy LLM
 
-A multi-agent framework where LLM sessions play Diplomacy against each other, with human adjudication of moves.
+A research framework using Diplomacy as a testbed to study LLM agent behavior in multi-agent strategic environments. LLM sessions play against each other with human adjudication of moves.
 
 ## Quick Start
 
@@ -23,15 +23,21 @@ Each country is controlled by a separate LLM session. The LLMs:
 - Update `game_history.md` with results
 - Advance the season in `config.yaml`
 
+## Research
+
+This project studies emergent LLM behaviors including strategic deception, spatial reasoning, and multi-agent coordination. See [`research/`](research/) for findings and experiments.
+
+**Core finding**: LLMs reason well about strategy and deception but struggle with spatial/mechanical reasoning that would be obvious to a human looking at a map.
+
 ## Season Flow
 
 Each season runs through three phases:
 
 ```
-DEBRIEF → TURN (x N rounds) → REFLECT
+PLAN → TURN (x N rounds) → REFLECT
 ```
 
-1. **DEBRIEF**: Review last season's results, extract lessons, plan messaging strategy
+1. **PLAN**: Consider strategic options, plan messaging strategy
 2. **TURN** (multiple rounds): Execute messaging plan, react to other countries
 3. **REFLECT**: Organize files, submit orders
 
@@ -40,7 +46,7 @@ DEBRIEF → TURN (x N rounds) → REFLECT
 | Command | Description |
 |---------|-------------|
 | `season` | Run a full season (all phases) |
-| `debrief [country]` | Learn from results, plan the season |
+| `plan [country]` | Consider strategic options, plan the season |
 | `<country>` | Run a single turn for one country |
 | `all` | Run turns for all countries |
 | `reflect [country]` | Organize files, submit orders |
